@@ -1,175 +1,306 @@
 # Campus Resource Management System (CampusRMS)
-
-CampusRMS is a full-stack, enterprise-grade Campus Resource Management System built to facilitate, monitor, and audit physical resource scheduling (laboratories, classrooms, conference halls, computer stations). It features role-based access control, transaction-safe scheduling validation, interactive floor plan navigation, and audit logs.
+A modern, glassmorphic full-stack web application for managing campus resources, reservations, and system users with role-based access controls, interactive floor plan maps, and real-time operational auditing.
 
 ---
 
-## 🏛️ System Architecture
+## 🚀 Features
 
-```mermaid
-graph TD
-    Client[React SPA Frontend] -->|JWT Authentication| Gateway[Django REST API Gateway]
-    Gateway -->|ORM Queries| DB[(MySQL Database)]
-    Gateway -->|Local Operations| SecurityLog[AuditLog Handler]
+### Core Operations
+*   **User Management**: Administrators can view, update, status-toggle, and manage system user credentials.
+*   **Resource Management**: Staff and Administrators can manage campus resources (Labs, Classrooms, Event Halls, Computers) with custom capacities, locations, and equipment tags.
+*   **Booking System**: Students can book resources with date/time-slot validation and printable access pass generation.
+*   **Role-Based Access**: Three user roles (Student, Staff, Admin) with granular permission guards.
+*   **Real-time Status**: Currently logged-in sessions dynamically display as `ACTIVE`, while logged-out/inactive accounts show as `INACTIVE`.
+*   **Smart Filters**: Search, category filters, and amenities tags filtering across resources.
+
+### Premium Extensions
+*   **🗺️ Interactive Floor Plan Map**: A custom SVG floor plan layout in the resources directory. Clicking on building wings filters the asset lists dynamically.
+*   **❤️ Starred Favorites**: Local storage-based favorites system to bookmark frequently used classrooms and laboratories.
+*   **📊 CSV Utilization Reports**: Admin-exclusive capability to download comprehensive stats reports containing system metrics, booking density charts, and live room occupancy statuses.
+*   **📅 Recurring Reservations**: Bulk booking option supporting Daily and Weekly schedules (creating 3 reservations) with transactional overlap prevention.
+*   **🎟️ Simulated QR Check-in**: Physical attendance check-in simulator on approved access passes that registers arrival times.
+*   **🔐 Compliance Audit Logs**: Server-side auditing mapping CRUD transactions, logins/logouts, and check-ins along with client IP addresses.
+
+---
+
+## 📋 Prerequisites
+*   **Python**: 3.8 or higher
+*   **Node.js**: 18.x or higher
+*   **MySQL**: 8.0 or higher
+*   **Git**
+
+---
+
+## 🛠️ Installation & Setup
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/Pavithrainiya/CampusCRMS.git
+cd CampusCRMS
 ```
 
----
+### 2. Backend Setup (Django)
 
-## 💻 Tech Stack Specification
-
-### Backend (REST API)
-*   **Framework**: Django 5.x & Django REST Framework (DRF) 3.15.x
-*   **Database Integration**: MySQL (Production Connection via `mysqlclient`) / SQLite (Fallback)
-*   **Authentication**: JSON Web Tokens (SimpleJWT: `rest_framework_simplejwt`)
-*   **CORS Management**: `django-cors-headers`
-
-### Frontend (Single Page Application)
-*   **Core Libraries**: React 18.x, Vite 6.x
-*   **Styling**: Vanilla CSS with Tailwind CSS configurations, glassmorphic UI patterns
-*   **Animation**: Framer Motion
-*   **Icons**: Lucide React
-*   **HTTP Client**: Axios (configured with interceptors to inject simpleJWT headers)
-
----
-
-## 🗄️ Database Schemas (Model Details)
-
-### 1. `User` Model
-Exposes user credentials and system permission flags.
-*   `email` (EmailField, Unique, Primary Key)
-*   `name` (CharField)
-*   `phone` (CharField, Unique)
-*   `role` (CharField: `Student`, `Staff`, `Admin`)
-*   `status` (CharField: `ACTIVE`, `INACTIVE`)
-*   `created_at` (DateTimeField)
-
-### 2. `Resource` Model
-Represents reservation assets.
-*   `resource_name` (CharField)
-*   `resource_type` (CharField: `Lab`, `Classroom`, `Event Hall`, `Computer`)
-*   `description` (TextField, Nullable)
-*   `capacity` (PositiveIntegerField)
-*   `location` (CharField) - Physical room and block directions
-*   `amenities` (TextField) - Comma-separated list of hardware/features (e.g. `Projector, VR Headset`)
-*   `availability_status` (BooleanField) - Maintenance flag
-*   `created_at` (DateTimeField)
-
-### 3. `Booking` Model
-Represents scheduling allocations.
-*   `user` (ForeignKey -> `User`)
-*   `resource` (ForeignKey -> `Resource`)
-*   `booking_date` (DateField)
-*   `time_slot` (CharField, e.g. `"09:00 AM - 11:00 AM"`)
-*   `purpose` (TextField)
-*   `status` (CharField: `Pending`, `Approved`, `Rejected`)
-*   `checked_in` (BooleanField) - Physical presence flag
-*   `check_in_time` (DateTimeField, Nullable)
-*   `created_at` (DateTimeField)
-
-### 4. `AuditLog` Model
-Captures system actions for compliance.
-*   `user` (ForeignKey -> `User`, Nullable)
-*   `action` (CharField, e.g. `"LOGIN_SUCCESS"`, `"BOOKING_CREATE"`)
-*   `timestamp` (DateTimeField)
-*   `ip_address` (GenericIPAddressField)
-
-### 5. `Notification` Model
-Feeds the live user alerts queue.
-*   `user` (ForeignKey -> `User`)
-*   `message` (TextField)
-*   `is_read` (BooleanField)
-*   `created_at` (DateTimeField)
-
----
-
-## 📡 API Endpoints Directory
-
-### Authentication
-*   `POST /api/token/` - Obtain JWT access/refresh token pair
-*   `POST /api/token/refresh/` - Refresh expired access token
-*   `POST /api/register/` - Create a new user profile
-*   `GET /api/user/` - Fetch profile metadata for authenticated session
-
-### Resources Directory
-*   `GET /api/resources/` - Query list of resources (supports `search` and `type` filters)
-*   `POST /api/resources/` - Create resource (Admin/Staff only)
-*   `PUT /api/resources/<id>/` - Update resource (Admin/Staff only)
-*   `DELETE /api/resources/<id>/` - Remove resource & cascade delete associated bookings
-
-### Bookings Workflow
-*   `GET /api/bookings/` - Retrieve bookings (Supports timeframe filters: `all`, `upcoming`, `past`)
-*   `POST /api/bookings/` - Create a booking (Includes optional `recurring_type` payload)
-*   `PUT /api/bookings/<id>/` - Update a pending booking
-*   `DELETE /api/bookings/<id>/` - Cancel a booking
-*   `POST /api/bookings/<id>/approve/` - Approve pending booking (Admin only)
-*   `POST /api/bookings/<id>/reject/` - Reject pending booking (Admin only)
-*   `POST /api/bookings/<id>/check_in/` - Trigger QR physical check-in status update
-
-### Dashboard Stats
-*   `GET /api/admin/stats/` - Retrieve metrics summary, live occupancy status, and booking density chart arrays
-
----
-
-## ⚙️ Core Workflows & Implementation Logic
-
-### 1. Recurring Booking Creation Loop
-When creating a recurring schedule, the client provides a `recurring_type` (`daily` or `weekly`). The backend processes this inside a database transaction:
-```python
-# Pseudo-implementation logic in views.py
-booking_dates = []
-if recurring_type == 'daily':
-    booking_dates = [base_date, base_date + 1 day, base_date + 2 days]
-elif recurring_type == 'weekly':
-    booking_dates = [base_date, base_date + 1 week, base_date + 2 weeks]
-
-with transaction.atomic():
-    for date in booking_dates:
-        # 1. Assert resource availability status
-        # 2. Check for overlapping Approved bookings in the same time_slot
-        # 3. Create independent Booking records
-```
-
-### 2. Simulated QR check-in
-Access passes feature printable barcodes. The student scans the barcode at the resource (simulated via **Simulate QR Check-In** on the UI pass modal):
-1. Client makes `POST /api/bookings/<id>/check_in/`.
-2. Backend validates:
-   - Requesting user owns the booking.
-   - The booking's `status == "Approved"`.
-   - Today's date matches the `booking_date`.
-3. If valid, `checked_in` changes to `True`, `check_in_time` is set to the current timestamp, and the action is logged in `AuditLog` alongside the client's IP.
-
-### 3. Utilization Exporter (CSV Reports)
-Admin dashboard features a button to export CSV files. The browser formats stats, usage density, and room statuses into a multi-table CSV format:
-```javascript
-// Local client CSV creation
-let csvContent = "data:text/csv;charset=utf-8,";
-csvContent += "SYSTEM SUMMARY REPORT\nMetric,Value\n...";
-csvContent += "\nRESOURCE UTILIZATION DENSITY\nResource Name,Total Bookings\n...";
-const encodedUri = encodeURI(csvContent);
-// Triggers local system browser download
-```
-
----
-
-## ⚙️ How to Deploy & Run
-
-### Setup Environment Variables
-Configure your database connectivity in `CampusRMS/backend/config/settings.py`'s `DATABASES` section to point to your MySQL server.
-
-### Run Backend
+#### On Windows:
 ```bash
 cd CampusRMS/backend
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-python manage.py makemigrations api
-python manage.py migrate
-python manage.py runserver
 ```
 
-### Run Frontend
+#### On Linux/Mac:
+```bash
+cd CampusRMS/backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### Configure Database:
+1. Create a MySQL database named `crmss`:
+   ```sql
+   CREATE DATABASE crmss;
+   ```
+2. Update the database settings in `CampusRMS/backend/config/settings.py` with your credentials:
+   ```python
+   DATABASES = {
+       'default': {
+           'ENGINE': 'django.db.backends.mysql',
+           'NAME': 'crmss',
+           'USER': 'your_mysql_username',
+           'PASSWORD': 'your_mysql_password',
+           'HOST': 'localhost',
+           'PORT': '3306',
+       }
+   }
+   ```
+
+#### Apply Migrations:
+```bash
+python manage.py makemigrations api
+python manage.py migrate
+```
+
+#### Seed Admin Account:
+```bash
+python manage.py create_admin
+```
+*   **Default Admin Email**: `admin@campusrms.com`
+*   **Default Admin Password**: `Admin@12345`
+
+---
+
+### 3. Frontend Setup (React + Vite)
+Open a new terminal:
 ```bash
 cd CampusRMS/frontend
 npm install
+```
+
+---
+
+## 🚀 Running the Application
+
+### Start Django Backend:
+```bash
+cd CampusRMS/backend
+python manage.py runserver
+```
+*   **Backend URL**: [http://localhost:8000](http://localhost:8000)
+
+### Start Vite React Frontend:
+```bash
+cd CampusRMS/frontend
 npm run dev
 ```
+*   **Frontend URL**: [http://localhost:5173](http://localhost:5173)
+
+---
+
+## 🔑 Default Login Credentials
+*   **Admin Account**:
+    *   **Email**: `admin@campusrms.com`
+    *   **Password**: `Admin@12345`
+*   **Test Student/Staff Accounts**: Register new profiles using the signup form on the frontend, or create them using the Admin Panel dashboard.
+
+---
+
+## 📱 User Roles & Permissions
+
+### Student
+*   Browse resources, search names, filter categories, and select amenities tags.
+*   Star favorite resources (persisted in browser storage).
+*   Create new bookings and request recurring schedules.
+*   Cancel own pending bookings and view approved access passes.
+*   Perform simulated QR check-in when physically arriving at the resource.
+
+### Staff
+*   All student booking and search permissions.
+*   Add, edit, modify, and delete resources.
+*   Set resource status to active or maintenance.
+*   View all bookings.
+
+### Admin
+*   Full Staff permissions.
+*   Approve or reject booking requests.
+*   Full user management (create new users, update profiles, toggle active status, and delete accounts).
+*   Export comprehensive utilization metrics and live system occupancy reports as CSV.
+
+---
+
+## 🎯 Key Features Explained
+
+### 1. Booking Validation
+*   Prevents reservations in past dates.
+*   Prevents reservations in past time slots on the current date.
+*   Prevents double bookings for the same resource, date, and time slot.
+*   Prevents students from booking different resources at the same time slot (overlapping student schedules).
+
+### 2. Password Requirements
+*   Minimum 8 characters.
+*   At least one uppercase letter.
+*   At least one lowercase letter.
+*   At least one number.
+*   At least one special character.
+
+---
+
+## 📂 Project Structure
+
+```
+CampusRMS/
+├── backend/
+│   ├── api/                    # Django Application
+│   │   ├── migrations/         # Database migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_resource_amenities_resource_location_notification.py
+│   │   │   └── 0003_booking_check_in_time_booking_checked_in_auditlog.py
+│   │   ├── management/commands/
+│   │   │   └── create_admin.py # Seed admin command
+│   │   ├── models.py           # Database models (User, Resource, Booking, AuditLog, Notification)
+│   │   ├── serializers.py      # DRF Model Serializers
+│   │   ├── views.py            # API views & ViewSets (Booking approvals, check-ins)
+│   │   ├── urls.py             # Router paths
+│   │   └── tests.py            # Backend test suite
+│   ├── config/                 # Settings configuration
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   └── manage.py
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/         # Context wrappers & layouts
+│   │   │   ├── AuthContext.jsx
+│   │   │   ├── Layout.jsx
+│   │   │   ├── RouteGuards.jsx
+│   │   │   └── ToastContext.jsx
+│   │   ├── pages/              # Interface pages
+│   │   │   ├── Bookings.jsx    # Booking schedules, pass modal, & check-in
+│   │   │   ├── Dashboard.jsx   # Metrics cards, graphs, & report export
+│   │   │   ├── Login.jsx
+│   │   │   ├── Register.jsx
+│   │   │   ├── Resources.jsx   # Interactive map, favorites, & resource cards
+│   │   │   └── Users.jsx       # User administration directory
+│   │   ├── services/
+│   │   │   └── api.js          # Axios API agent
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css           # Glassmorphic Tailwind styling
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   └── package.json
+└── README.md
+```
+
+---
+
+## 🔧 Common Commands
+
+### Backend Commands:
+```bash
+# Run server
+python manage.py runserver
+
+# Generate migrations
+python manage.py makemigrations api
+
+# Apply database updates
+python manage.py migrate
+
+# Run views and validation tests
+python manage.py test api
+
+# Create customized admin user
+python manage.py create_admin
+
+# Django shell console
+python manage.py shell
+```
+
+### Frontend Commands:
+```bash
+# Install assets
+npm install
+
+# Run Vite dev server
+npm run dev
+
+# Compile production bundle
+npm run build
+```
+
+---
+
+## 📊 API Endpoints
+
+### Authentication
+*   `POST /api/token/` - Obtain JWT Token
+*   `POST /api/token/refresh/` - Refresh JWT Token
+*   `POST /api/register/` - Create a new user account
+*   `GET /api/user/` - Fetch currently authenticated user details
+
+### Users List (Admin)
+*   `GET /api/users/` - List all users
+*   `POST /api/users/` - Create a new user
+*   `PUT /api/users/{id}/` - Update a user profile
+*   `DELETE /api/users/{id}/` - Delete user profile
+
+### Resources Directory
+*   `GET /api/resources/` - Query resources
+*   `POST /api/resources/` - Create resource
+*   `PUT /api/resources/{id}/` - Update resource details
+*   `DELETE /api/resources/{id}/` - Delete resource
+
+### Bookings Workflow
+*   `GET /api/bookings/` - Retrieve bookings
+*   `POST /api/bookings/` - Create booking (supports `recurring_type` payload)
+*   `PUT /api/bookings/{id}/` - Modify pending booking details
+*   `DELETE /api/bookings/{id}/` - Cancel a booking
+*   `POST /api/bookings/{id}/approve/` - Approve reservation (Admin)
+*   `POST /api/bookings/{id}/reject/` - Reject reservation (Admin)
+*   `POST /api/bookings/{id}/check_in/` - Simulated QR attendance check-in
+
+### System Analytics (Admin)
+*   `GET /api/admin/stats/` - Retrieve dashboard telemetry and occupancy statuses
+
+---
+
+## 🔐 Security Features
+*   **Password Hashing**: Implements Django's built-in PBKDF2 secure password hashing algorithms.
+*   **Session Guard**: Authenticated endpoints protected via JSON Web Tokens (SimpleJWT).
+*   **SQL Injection Prevention**: Standard database operations executed safely via Django's secure QuerySet abstraction layer.
+*   **XSS Protection**: Sanitized UI state binding and inputs through Vite React.
+*   **Audit Logging**: Persistent transaction accountability capturing request timestamps and user IP addresses.
+
+---
+
+## 🎨 Tech Stack
+*   **Backend**: Django 5.x, Django REST Framework 3.x, MySQL, simpleJWT.
+*   **Frontend**: React 18, Vite 6, Tailwind CSS, Framer Motion, Lucide Icons, Axios.
+
+---
+
+## 📝 License
+This project is created for educational and campus administration purposes.
