@@ -1,0 +1,21 @@
+# Node
+**/node_modules/
+**/dist/
+**/dist-ssr/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/env/
+**/venv/
+**/.env
+
+# Local env files
+.env*.local
+
+# OS files
+.DS_Store
+Thumbs.db
