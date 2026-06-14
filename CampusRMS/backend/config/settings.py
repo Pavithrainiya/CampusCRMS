@@ -21,6 +21,7 @@ if 'RAILWAY_STATIC_URL' in os.environ:
 
 CSRF_TRUSTED_ORIGINS = [
     'https://campuscrms-production.up.railway.app',
+    'https://campuscrms.netlify.app',
 ]
 
 INSTALLED_APPS = [
@@ -138,7 +139,10 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOWED_ORIGINS = [
+    "https://campuscrms.netlify.app",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
