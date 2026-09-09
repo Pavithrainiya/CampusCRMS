@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden min-h-screen selection:bg-primary-500 selection:text-white;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-900/50;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-700/50 rounded-full hover:bg-slate-600/50 transition-colors duration-200;
+}
+
+/* Premium Glassmorphic Cards */
+.glass-panel {
+  @apply bg-slate-900/40 backdrop-blur-xl border border-slate-800/40 shadow-2xl;
+}
+
+.glass-card {
+  @apply bg-slate-900/50 backdrop-blur-lg border border-slate-800/50 hover:border-primary-500/30 transition-all duration-300 shadow-xl;
+}
+
+.glass-input {
+  @apply bg-slate-950/50 border border-slate-800 focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/30 focus:outline-none transition-all duration-300 placeholder:text-slate-500;
+}
+
+/* Soft Radial Backdrop Gradients */
+.bg-radial-gradient {
+  background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.15), transparent 60%),
+              radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.15), transparent 60%),
+              #020617;
+}
+
+/* Gradient text utility */
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-secondary-400 to-accent-400;
+}
+
+/* Custom button gradients */
+.btn-primary {
+  @apply bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-500 hover:to-secondary-500 text-white font-medium shadow-lg hover:shadow-primary-500/10 active:scale-[0.98] transition-all duration-200;
+}
+
+.btn-secondary {
+  @apply bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all duration-200;
+}
+
+.btn-danger {
+  @apply bg-gradient-to-r from-red-600 to-accent-600 hover:from-red-500 hover:to-accent-500 text-white font-medium shadow-lg hover:shadow-red-500/10 active:scale-[0.98] transition-all duration-200;
+}
+
+
