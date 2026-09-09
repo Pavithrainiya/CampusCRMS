@@ -58,23 +58,25 @@ pip install -r requirements.txt
 ```
 
 #### Configure Database:
-1. Create a MySQL database named `crmss`:
+1. Create a PostgreSQL database named `campusrms_db`:
    ```sql
-   CREATE DATABASE crmss;
+   CREATE DATABASE campusrms_db;
    ```
 2. Update the database settings in `CampusRMS/backend/config/settings.py` with your credentials:
    ```python
    DATABASES = {
        'default': {
-           'ENGINE': 'django.db.backends.mysql',
-           'NAME': 'crmss',
-           'USER': 'your_mysql_username',
-           'PASSWORD': 'your_mysql_password',
+           'ENGINE': 'django.db.backends.postgresql',
+           'NAME': 'campusrms_db',
+           'USER': 'your_postgresql_username',
+           'PASSWORD': 'your_postgresql_password',
            'HOST': 'localhost',
-           'PORT': '3306',
+           'PORT': '5432',
        }
    }
    ```
+
+   **For Render Deployment**: The database is configured automatically via `DATABASE_URL` environment variable.
 
 #### Apply Migrations:
 ```bash
@@ -297,10 +299,50 @@ npm run build
 ---
 
 ## 🎨 Tech Stack
-*   **Backend**: Django 5.x, Django REST Framework 3.x, MySQL, simpleJWT.
-*   **Frontend**: React 18, Vite 6, Tailwind CSS, Framer Motion, Lucide Icons, Axios.
+*   **Backend**: Django 5.x, Django REST Framework 3.x, PostgreSQL, simpleJWT, Celery, Redis, Channels.
+*   **Frontend**: React 18, Vite 6, Tailwind CSS, Framer Motion, Lucide Icons, Axios, FullCalendar.js.
+*   **Features**: Email Notifications, QR Code Check-in, Calendar View, Real-time WebSockets, Analytics Dashboard.
 
 ---
 
-## 📝 License
+## � Deployment to Render
+
+### Quick Deploy (10 Minutes)
+
+1. **Push code to GitHub** (Already done! ✅)
+   ```bash
+   git push origin main
+   ```
+
+2. **Create PostgreSQL Database on Render**:
+   - Go to https://dashboard.render.com/
+   - Click **New +** → **PostgreSQL**
+   - Name: `campusrms-db`, Database: `campusrms_db`
+   - Plan: **Free**
+   - Copy the **Internal Database URL**
+
+3. **Deploy Web Service**:
+   - Click **New +** → **Web Service**
+   - Connect your GitHub repo: `Pavithrainiya/CampusCRMS`
+   - Settings:
+     - Root Directory: `backend`
+     - Build Command: `chmod +x build.sh && ./build.sh`
+     - Start Command: `gunicorn config.wsgi:application`
+   - Environment Variables:
+     ```
+     PYTHON_VERSION = 3.11.0
+     DATABASE_URL = [Your Internal Database URL]
+     SECRET_KEY = [Generate new secret key]
+     DEBUG = False
+     ```
+
+4. **Update Frontend**: Set `VITE_API_URL` to your Render backend URL
+
+📚 **Detailed Guides**: 
+- `backend/QUICK_START_RENDER.md` - 10-minute quick start
+- `backend/RENDER_DEPLOYMENT.md` - Complete deployment guide
+
+---
+
+## �📝 License
 This project is created for educational and campus administration purposes.
