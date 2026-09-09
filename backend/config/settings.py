@@ -26,9 +26,10 @@ if 'RAILWAY_STATIC_URL' in os.environ:
     ALLOWED_HOSTS.append(os.environ['RAILWAY_STATIC_URL'])
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://campuscrms-production.up.railway.app',
-    'https://campuscrms.netlify.app',
-    'https://*.onrender.com',  # Added for Render
+    "https://campus-crms.vercel.app",
+    "https://campuscrms-production.up.railway.app",
+    "https://campuscrms.netlify.app",
+    "https://*.onrender.com",
 ]
 
 if 'RENDER_EXTERNAL_URL' in os.environ:
@@ -194,7 +195,8 @@ SIMPLE_JWT = {
 # CORS Settings
 
 CORS_ALLOWED_ORIGINS = [
-    "https://campuscrms.netlify.app",
+    "https://campus-crms.vercel.app",
+    "https://campusrms.netlify.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
