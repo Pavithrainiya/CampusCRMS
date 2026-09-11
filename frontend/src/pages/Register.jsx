@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
-import { Mail, Lock, Eye, EyeOff, Activity, User, Phone, CheckCircle, XCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Activity, User, Phone, Shield, CheckCircle, XCircle } from 'lucide-react';
 
 const Register = () => {
   const { register } = useAuth();
@@ -12,6 +12,7 @@ const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('Student');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +57,7 @@ const Register = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    const result = await register(name, email, phone, password);
+    const result = await register(name, email, phone, password, role);
     setIsLoading(false);
 
     if (result.success) {
@@ -166,28 +167,50 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Email Address */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
-                  <Mail className="w-5 h-5" />
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-lg glass-input text-slate-200 text-sm ${
-                    errors.email ? 'border-rose-500/50 focus:border-rose-500' : ''
-                  }`}
-                  placeholder="john.doe@university.edu"
-                />
+            {/* Email Address & Account Role */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                    <Mail className="w-5 h-5" />
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-lg glass-input text-slate-200 text-sm ${
+                      errors.email ? 'border-rose-500/50 focus:border-rose-500' : ''
+                    }`}
+                    placeholder="john.doe@university.edu"
+                  />
+                </div>
+                {errors.email && (
+                  <span className="text-xs text-rose-400 font-medium mt-1 block">{errors.email}</span>
+                )}
               </div>
-              {errors.email && (
-                <span className="text-xs text-rose-400 font-medium mt-1 block">{errors.email}</span>
-              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Account Role
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                    <Shield className="w-5 h-5" />
+                  </span>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg glass-input text-slate-200 text-sm bg-slate-900 border border-slate-800"
+                  >
+                    <option value="Student" className="bg-slate-900 text-slate-200">Student</option>
+                    <option value="Staff" className="bg-slate-900 text-slate-200">Staff</option>
+                    <option value="Admin" className="bg-slate-900 text-slate-200">Admin</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {/* Password */}

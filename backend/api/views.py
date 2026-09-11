@@ -116,8 +116,15 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save(role='Student')  # Default role is Student
-            log_action(user, "Student registered account", request)
+            req_role = request.data.get('role', 'Student')
+            if req_role not in ['Student', 'Staff', 'Admin']:
+                req_role = 'Student'
+            
+            is_staff = True if req_role in ['Staff', 'Admin'] else False
+            is_superuser = True if req_role == 'Admin' else False
+            
+            user = serializer.save(role=req_role, is_staff=is_staff, is_superuser=is_superuser)
+            log_action(user, f"{req_role} account registered", request)
             
             # Send welcome email asynchronously via daemon thread
             run_async(send_welcome_email, user.id)
@@ -130,7 +137,7 @@ class RegisterView(APIView):
                 'user': user_data,
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
-                'message': 'Account registered successfully!'
+                'message': f'{req_role} account registered successfully!'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
