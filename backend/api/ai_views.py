@@ -8,6 +8,21 @@ from django.db.models import Count, Q, Avg
 from api.models import Resource, Booking, ResourceReview, User
 from api.serializers import ResourceSerializer
 
+STOP_WORDS = {'book', 'reserve', 'find', 'for', 'the', 'a', 'an', 'is', 'are', 'in', 'on', 'at', 'me', 'need', 'want', 'looking', 'capacity', 'people', 'person', 'students', 'slot', 'tomorrow', 'today', 'room', 'get', 'with', 'and', 'or', 'of', 'to', 'for', 'what', 'which', 'how', 'show', 'list', 'please'}
+
+SYNONYM_MAP = {
+    'mac': ['mac', 'macbook', 'apple', 'imac', 'ios'],
+    'macbook': ['mac', 'macbook', 'apple', 'imac'],
+    'pc': ['pc', 'computer', 'desktop', 'laptop', 'windows'],
+    'computer': ['pc', 'computer', 'desktop', 'macbook', 'workstation'],
+    'gaming': ['gaming', 'gpu', 'graphics', 'rtx', 'alienware', 'game'],
+    'lab': ['lab', 'laboratory', 'workstation', 'hub'],
+    'hall': ['hall', 'auditorium', 'conference', 'event'],
+    'lecture': ['lecture', 'classroom', 'seminar', 'hall'],
+    'science': ['science', 'chemistry', 'biology', 'physics'],
+    'studio': ['studio', 'design', 'art'],
+}
+
 class RAGEngine:
     """
     Retrieval-Augmented Generation Engine for CampusRMS.
@@ -22,10 +37,21 @@ class RAGEngine:
         return set(re.findall(r'\b\w+\b', text.lower()))
 
     @classmethod
-    def calculate_score(cls, query_tokens, resource):
-        score = 0.0
+    def token_match_score(cls, q_token, target_tokens):
+        if not q_token or q_token in STOP_WORDS or q_token.isdigit():
+            return 0.0
         
-        # Field weights for RAG ranking
+        synonyms = SYNONYM_MAP.get(q_token, [q_token])
+        for syn in synonyms:
+            for target in target_tokens:
+                if syn == target:
+                    return 4.0
+                if len(syn) >= 3 and (syn in target or target in syn):
+                    return 3.0
+        return 0.0
+
+    @classmethod
+    def calculate_score(cls, query_tokens, resource, target_capacity=None, resource_type=None):
         name_tokens = cls.tokenize(resource.resource_name)
         type_tokens = cls.tokenize(resource.resource_type)
         equip_tokens = cls.tokenize(resource.equipment_needed or '')
@@ -34,51 +60,58 @@ class RAGEngine:
         amenities_tokens = cls.tokenize(resource.amenities or '')
         desc_tokens = cls.tokenize(resource.description or '')
 
-        for token in query_tokens:
-            if token in name_tokens:
-                score += 4.0
-            if token in type_tokens:
-                score += 3.0
-            if token in equip_tokens:
-                score += 2.5
-            if token in dress_tokens:
-                score += 2.0
-            if token in materials_tokens:
-                score += 2.0
-            if token in amenities_tokens:
-                score += 1.5
-            if token in desc_tokens:
-                score += 1.0
+        text_score = 0.0
+        for q_token in query_tokens:
+            text_score += cls.token_match_score(q_token, name_tokens) * 2.5
+            text_score += cls.token_match_score(q_token, type_tokens) * 2.0
+            text_score += cls.token_match_score(q_token, equip_tokens) * 1.5
+            text_score += cls.token_match_score(q_token, dress_tokens) * 1.2
+            text_score += cls.token_match_score(q_token, materials_tokens) * 1.2
+            text_score += cls.token_match_score(q_token, amenities_tokens) * 1.0
+            text_score += cls.token_match_score(q_token, desc_tokens) * 0.8
 
-        return score
+        if resource_type:
+            r_type_tokens = cls.tokenize(resource_type)
+            for rt in r_type_tokens:
+                if rt in type_tokens or any(rt in t or t in rt for t in type_tokens):
+                    text_score += 6.0
+
+        final_score = text_score
+
+        if target_capacity:
+            if resource.capacity >= target_capacity:
+                diff = resource.capacity - target_capacity
+                final_score += max(1.0, 8.0 - (diff * 0.05))
+            else:
+                final_score -= 15.0
+
+        return text_score, final_score
 
     @classmethod
-    def retrieve_relevant_resources(cls, query_text, target_capacity=None, top_k=3):
+    def retrieve_relevant_resources(cls, query_text, target_capacity=None, resource_type=None, top_k=3):
         query_tokens = cls.tokenize(query_text)
         resources = Resource.objects.filter(availability_status=True)
         
         scored_resources = []
+        has_any_text_match = False
+
         for res in resources:
-            score = cls.calculate_score(query_tokens, res)
+            text_score, final_score = cls.calculate_score(query_tokens, res, target_capacity, resource_type)
+            if text_score > 0:
+                has_any_text_match = True
+            scored_resources.append((text_score, final_score, res))
 
-            # Boost score based on capacity count matching
-            if target_capacity:
-                if res.capacity >= target_capacity:
-                    score += 5.0  # Bonus for accommodating requested count
-                    diff = res.capacity - target_capacity
-                    score += max(0, 3.0 - (diff * 0.05))
-                else:
-                    score -= 10.0 # Penalty if room capacity is too small for count
-
-            scored_resources.append((score, res))
-
-        # Sort by relevance score descending
-        scored_resources.sort(key=lambda x: x[0], reverse=True)
+        # Sort by final score descending
+        scored_resources.sort(key=lambda x: x[1], reverse=True)
         
-        # Filter top_k
-        top_matches = [res for score, res in scored_resources[:top_k]]
+        # If specific keywords were supplied in query text but no text matches exist at all in DB:
+        non_stop_query_tokens = [t for t in query_tokens if t not in STOP_WORDS and not t.isdigit()]
+        if non_stop_query_tokens and not has_any_text_match:
+            return []
+
+        top_matches = [res for ts, fs, res in scored_resources[:top_k] if fs > -10.0]
         if not top_matches and resources.exists():
-            top_matches = list(resources[:top_k])
+            top_matches = [res for ts, fs, res in scored_resources[:top_k]]
             
         return top_matches
 
@@ -101,9 +134,9 @@ class IntentExtractor:
     def parse_query(cls, text):
         text_lower = text.lower()
 
-        # Extract capacity count (e.g. "50", "count 50", "capacity 50", "for 15 people", "count 1", "count 2")
+        # Extract capacity count (e.g. "50", "count 50", "capacity 50", "for 15 people", "count 1", "15 students")
         capacity = None
-        cap_match = re.search(r'\b(?:count|capacity|for|seats|people|students|size|number)?\s*(\d{1,3})\s*(?:people|students|seats|capacity|persons|users|count|members)?\b', text_lower)
+        cap_match = re.search(r'\b(?:count|capacity|for|seats|people|students|size|number)?\s*(\d{1,3})\s*(?:people|person|persons|students|seats|capacity|users|count|members)?\b', text_lower)
         if cap_match:
             try:
                 val = int(cap_match.group(1))
@@ -114,23 +147,24 @@ class IntentExtractor:
         
         if not capacity:
             nums = re.findall(r'\b\d{1,3}\b', text_lower)
-            if nums:
+            for n in nums:
                 try:
-                    val = int(nums[0])
+                    val = int(n)
                     if 1 <= val <= 500:
                         capacity = val
+                        break
                 except ValueError:
                     pass
 
         # Extract resource type
         resource_type = None
-        if 'mac' in text_lower or 'computer' in text_lower or 'pc' in text_lower or 'gaming' in text_lower:
-            resource_type = 'Computer' if ('mac' in text_lower or 'gaming' in text_lower or 'pc' in text_lower) else 'Lab'
-        elif 'lab' in text_lower or 'science' in text_lower or 'chemistry' in text_lower:
+        if any(k in text_lower for k in ['mac', 'macbook', 'pc', 'computer', 'gaming', 'laptop']):
+            resource_type = 'Computer'
+        elif any(k in text_lower for k in ['lab', 'science', 'chemistry', 'physics', 'studio']):
             resource_type = 'Lab'
-        elif 'hall' in text_lower or 'auditorium' in text_lower or 'event' in text_lower or 'conference' in text_lower:
+        elif any(k in text_lower for k in ['hall', 'auditorium', 'event', 'conference']):
             resource_type = 'Event Hall'
-        elif 'lecture' in text_lower or 'classroom' in text_lower or 'seminar' in text_lower:
+        elif any(k in text_lower for k in ['lecture', 'classroom', 'seminar']):
             resource_type = 'Classroom'
 
         # Extract date (e.g. "tomorrow", "today", or specific date)
@@ -158,7 +192,7 @@ class IntentExtractor:
             intent = 'book'
         elif any(w in text_lower for w in ['quiet', 'offpeak', 'off-peak', 'traffic', 'least busy', 'crowded']):
             intent = 'offpeak'
-        elif any(w in text_lower for w in ['recommend', 'best', 'suggest', 'find me']):
+        elif any(w in text_lower for w in ['recommend', 'best', 'suggest', 'find']):
             intent = 'recommend'
 
         return {
@@ -190,6 +224,7 @@ class AIAssistantView(APIView):
         retrieved_resources = RAGEngine.retrieve_relevant_resources(
             query_text=user_message,
             target_capacity=parsed['capacity'],
+            resource_type=parsed['resource_type'],
             top_k=3
         )
         
