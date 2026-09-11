@@ -575,10 +575,24 @@ const Resources = () => {
           <div className="w-10 h-10 rounded-full border-2 border-t-primary-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
         </div>
       ) : filteredResources.length === 0 ? (
-        <div className="glass-panel rounded-xl border border-slate-800/50 p-12 text-center max-w-md mx-auto">
-          <Info className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-slate-300">No resources matched</h3>
-          <p className="text-slate-500 text-sm mt-1">Try resetting the filters or modifying your search.</p>
+        <div className="glass-panel rounded-xl border border-slate-800/50 p-12 text-center max-w-md mx-auto space-y-3">
+          <Info className="w-12 h-12 text-slate-500 mx-auto mb-2" />
+          <h3 className="text-lg font-bold text-slate-300">No resources found</h3>
+          <p className="text-slate-500 text-sm">No campus facilities currently in database.</p>
+          <button
+            onClick={async () => {
+              try {
+                await API.post('/resources/seed_sample/');
+                showToast('Campus facilities populated successfully!', 'success');
+                fetchResources();
+              } catch (err) {
+                showToast('Failed to seed sample resources', 'error');
+              }
+            }}
+            className="btn-primary px-4 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-2 shadow-lg shadow-primary-500/20"
+          >
+            Populate Sample Campus Facilities
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

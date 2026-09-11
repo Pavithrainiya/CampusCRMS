@@ -154,9 +154,15 @@ class ResourceViewSet(viewsets.ModelViewSet):
     serializer_class = ResourceSerializer
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'export_csv', 'recommendations']:
+        if self.action in ['list', 'retrieve', 'export_csv', 'recommendations', 'seed_sample']:
             return [permissions.IsAuthenticated()]
         return [IsStaffOrAdmin()]
+
+    @action(detail=False, methods=['post'])
+    def seed_sample(self, request):
+        from django.core.management import call_command
+        call_command('create_sample_resources')
+        return Response({"message": "Successfully populated campus facilities!"}, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         resource = serializer.save(created_by=self.request.user)
