@@ -1,3 +1,4 @@
+# CampusRMS V2.4 Docker Services Stack
 services:
   db:
     image: postgres:16

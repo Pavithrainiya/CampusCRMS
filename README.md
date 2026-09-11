@@ -1,25 +1,28 @@
-# Campus Resource Management System (CampusRMS)
-A modern, glassmorphic full-stack web application for managing campus resources, reservations, and system users with role-based access controls, interactive floor plan maps, and real-time operational auditing.
+# Campus Resource Management System (CampusRMS V2.4)
+A modern, glassmorphic full-stack web application for managing campus resources, reservations, RAG AI intelligence, and system users with role-based access controls, interactive floor plan maps, live Gmail SMTP email notifications, and real-time operational auditing.
 
 ---
 
-## 🚀 Features
+## 🚀 Features & Capabilities (V2.4 Release)
 
-### Core Operations
-*   **User Management**: Administrators can view, update, status-toggle, and manage system user credentials.
-*   **Resource Management**: Staff and Administrators can manage campus resources (Labs, Classrooms, Event Halls, Computers) with custom capacities, locations, and equipment tags.
-*   **Booking System**: Students can book resources with date/time-slot validation and printable access pass generation.
-*   **Role-Based Access**: Three user roles (Student, Staff, Admin) with granular permission guards.
-*   **Real-time Status**: Currently logged-in sessions dynamically display as `ACTIVE`, while logged-out/inactive accounts show as `INACTIVE`.
-*   **Smart Filters**: Search, category filters, and amenities tags filtering across resources.
+### 🤖 Retrieval-Augmented Generation (RAG V2.4) AI Suite
+*   **Semantic Natural Language Querying**: Parses queries like *"book mac capacity for 15 person"* using fuzzy token matching and synonym expansion (`mac` -> `MacBook Pro Lab`, `pc` -> `Computer`).
+*   **Capacity Fit & Off-Peak Optimization**: Ranks facilities by requested group size and recommends low-traffic quiet windows.
+*   **1-Click Action Payloads**: Generates instant booking reservation action cards inside the drawer chat.
 
-### Premium Extensions
-*   **🗺️ Interactive Floor Plan Map**: A custom SVG floor plan layout in the resources directory. Clicking on building wings filters the asset lists dynamically.
-*   **❤️ Starred Favorites**: Local storage-based favorites system to bookmark frequently used classrooms and laboratories.
-*   **📊 CSV Utilization Reports**: Admin-exclusive capability to download comprehensive stats reports containing system metrics, booking density charts, and live room occupancy statuses.
-*   **📅 Recurring Reservations**: Bulk booking option supporting Daily and Weekly schedules (creating 3 reservations) with transactional overlap prevention.
-*   **🎟️ Simulated QR Check-in**: Physical attendance check-in simulator on approved access passes that registers arrival times.
-*   **🔐 Compliance Audit Logs**: Server-side auditing mapping CRUD transactions, logins/logouts, and check-ins along with client IP addresses.
+### 📧 Automated Gmail Email & In-App Notifications
+*   **Live Gmail SMTP Dispatch**: Automatically sends email confirmations upon booking creation, approval, rejection, or cancellation using `pavijeevi56@gmail.com`.
+*   **Real-time In-App Notifications**: Simultaneously creates in-app database notifications visible in the header bell notification drawer.
+
+### 🏛️ Free 1-Click Resource Reservations
+*   **100% Free Campus Facilities**: Direct 1-click booking for all facilities (Auditorium, Labs, Classrooms, PC Hubs) with zero payment barrier or checkout prompts.
+*   **Auto-Seeding Sample Facilities & Student Reviews**: Automatic population of 12 detailed facilities with high-res images, dress codes, equipment rules, materials required, and 25 student reviews & star ratings.
+
+### 📊 Advanced Analytics & Operations
+*   **User & Role Management**: Direct role registration (Student, Staff, Admin) and active session status tracking.
+*   **Interactive Building Floor Plan**: Custom SVG floor plan wings to filter directory assets dynamically.
+*   **QR Pass Verification Scanner**: Live camera & fallback scanner for instant campus check-in validation.
+*   **CSV Exports & Auditing**: One-click resource list CSV exports and server-side transaction audit logs.
 
 ---
 
