@@ -40,31 +40,31 @@ export default function QrScanner() {
   };
 
   const startCamera = async () => {
-    if (!('BarcodeDetector' in window)) {
-      showToast('Camera barcode detection API is not supported in this browser. Enter or paste the pass code instead.', 'info');
-      return;
-    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
       setScanning(true);
-      timerRef.current = setInterval(async () => {
-        try {
-          if (videoRef.current) {
-            const [code] = await detector.detect(videoRef.current);
-            if (code?.rawValue) {
-              stopCamera();
-              verify(code.rawValue);
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        timerRef.current = setInterval(async () => {
+          try {
+            if (videoRef.current) {
+              const [code] = await detector.detect(videoRef.current);
+              if (code?.rawValue) {
+                stopCamera();
+                verify(code.rawValue);
+              }
             }
-          }
-        } catch (_) { /* wait for readable frame */ }
-      }, 500);
+          } catch (_) { /* wait for readable frame */ }
+        }, 500);
+      } else {
+        showToast('Camera active. You can also paste or type the pass code below.', 'info');
+      }
     } catch (_) {
-      showToast('Camera permission was not granted.', 'error');
+      showToast('Camera permission was not granted or camera unavailable.', 'error');
     }
   };
 
