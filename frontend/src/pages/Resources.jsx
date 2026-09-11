@@ -626,8 +626,8 @@ const Resources = () => {
                       </span>
 
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-extrabold bg-indigo-500/90 text-white border border-indigo-400/30 backdrop-blur-md shadow-lg">
-                          {parseFloat(resource.hourly_rate) > 0 ? `$${parseFloat(resource.hourly_rate).toFixed(2)}/hr` : 'Free'}
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-extrabold bg-emerald-500/90 text-white border border-emerald-400/30 backdrop-blur-md shadow-lg">
+                          Free
                         </span>
 
                         <button

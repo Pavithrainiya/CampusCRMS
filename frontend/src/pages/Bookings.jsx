@@ -295,19 +295,11 @@ const Bookings = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Payment Gateway Checkout for Paid Resources
-    const selectedRes = resources.find(r => String(r.id) === String(formData.resource));
-    if (selectedRes && parseFloat(selectedRes.hourly_rate) > 0 && !hasPaid && !editingBooking) {
-      setPendingPaymentResource(selectedRes);
-      setPaymentModalOpen(true);
-      return;
-    }
-
     try {
       const payload = {
         ...formData,
-        amount_paid: hasPaid && selectedRes ? parseFloat(selectedRes.hourly_rate) : 0,
-        payment_status: hasPaid && selectedRes ? 'PAID' : 'FREE',
+        amount_paid: 0,
+        payment_status: 'FREE',
         recurring_type: isRecurring ? recurringType : null
       };
 

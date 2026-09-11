@@ -16,9 +16,18 @@ def booking_start(booking):
 
 @shared_task
 def send_booking_created_email(booking_id):
-    """Send confirmation email when a student submits a new booking request"""
+    """Send confirmation email & notification when a student submits a new booking request"""
     try:
         booking = Booking.objects.select_related('user', 'resource').get(id=booking_id)
+        
+        # 1. Create in-app notification
+        Notification.objects.create(
+            user=booking.user,
+            message=f"📌 Reservation request submitted for {booking.resource.resource_name} on {booking.booking_date} ({booking.time_slot}). Currently pending administrator review."
+        )
+        send_realtime_notification(booking.user.id, f"Reservation submitted for {booking.resource.resource_name}")
+
+        # 2. Dispatch email notification
         subject = f'Reservation Request Submitted: {booking.resource.resource_name}'
         message = f"""Dear {booking.user.name},
 
@@ -45,22 +54,34 @@ You will receive an email notification as soon as the administrator approves you
 Best regards,
 CampusRMS Administration Team
 """
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@campusrms.com')
         send_mail(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL,
+            from_email,
             [booking.user.email],
-            fail_silently=False,
+            fail_silently=True,
         )
+        print(f"[EMAIL NOTIFICATION] Request confirmation sent to {booking.user.email}")
         return f"Request confirmation email sent to {booking.user.email}"
     except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send request confirmation email: {str(e)}")
         return f"Failed to send request confirmation email: {str(e)}"
 
 @shared_task
 def send_booking_approved_email(booking_id):
-    """Send email when booking is approved by Admin"""
+    """Send email & notification when booking is approved by Admin"""
     try:
         booking = Booking.objects.select_related('user', 'resource').get(id=booking_id)
+
+        # 1. Create in-app notification
+        Notification.objects.create(
+            user=booking.user,
+            message=f"✓ Great news! Your booking for {booking.resource.resource_name} on {booking.booking_date} ({booking.time_slot}) has been APPROVED! Pass Code: #CRMS-PASS-{booking.id}"
+        )
+        send_realtime_notification(booking.user.id, f"✓ Booking Approved: {booking.resource.resource_name}")
+
+        # 2. Dispatch email notification
         subject = f'✓ Booking Approved: {booking.resource.resource_name} (#CRMS-PASS-{booking.id})'
         message = f"""Dear {booking.user.name},
 
@@ -87,22 +108,34 @@ When you arrive at the facility, present your Pass Approval Code (#CRMS-PASS-{bo
 Best regards,
 CampusRMS Administration Team
 """
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@campusrms.com')
         send_mail(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL,
+            from_email,
             [booking.user.email],
-            fail_silently=False,
+            fail_silently=True,
         )
+        print(f"[EMAIL NOTIFICATION] Approval email sent to {booking.user.email}")
         return f"Approval email sent successfully to {booking.user.email}"
     except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send approval email: {str(e)}")
         return f"Failed to send email to student: {str(e)}"
 
 @shared_task
 def send_booking_rejected_email(booking_id):
-    """Send email when booking is rejected by Admin"""
+    """Send email & notification when booking is rejected by Admin"""
     try:
         booking = Booking.objects.select_related('user', 'resource').get(id=booking_id)
+
+        # 1. Create in-app notification
+        Notification.objects.create(
+            user=booking.user,
+            message=f"❌ Your reservation request for {booking.resource.resource_name} on {booking.booking_date} was REJECTED by Administration."
+        )
+        send_realtime_notification(booking.user.id, f"Reservation REJECTED: {booking.resource.resource_name}")
+
+        # 2. Dispatch email notification
         subject = f'Booking Request Update: {booking.resource.resource_name}'
         message = f"""Dear {booking.user.name},
 
@@ -123,15 +156,18 @@ If you have questions or require an alternative space, please submit a new reser
 Best regards,
 CampusRMS Administration Team
 """
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@campusrms.com')
         send_mail(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL,
+            from_email,
             [booking.user.email],
-            fail_silently=False,
+            fail_silently=True,
         )
+        print(f"[EMAIL NOTIFICATION] Rejection email sent to {booking.user.email}")
         return f"Rejection email sent to {booking.user.email}"
     except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send rejection email: {str(e)}")
         return f"Failed to send email to student: {str(e)}"
 
 @shared_task
