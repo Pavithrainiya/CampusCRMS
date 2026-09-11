@@ -28,17 +28,19 @@ def send_booking_created_email(booking_id):
         send_realtime_notification(booking.user.id, f"Reservation submitted for {booking.resource.resource_name}")
 
         # 2. Dispatch email notification
-        subject = f'Reservation Request Submitted: {booking.resource.resource_name}'
+        subject = f'Reservation Request Submitted: {booking.resource.resource_name} (#CRMS-PASS-{booking.id})'
         message = f"""Dear {booking.user.name},
 
 Thank you for submitting a reservation request on CampusRMS! Your request has been received and is currently pending administrator review.
 
---- RESERVATION SUMMARY ---
-Request Pass Code: #CRMS-PASS-{booking.id}
+--- PASS APPROVAL CODE ---
+Pass Code: #CRMS-PASS-{booking.id}
+
+--- FACILITY & SPACE DETAILS ---
 Facility Resource: {booking.resource.resource_name} ({booking.resource.resource_type})
 Location: {booking.resource.location or 'Campus Main Block'}
 Capacity: {booking.resource.capacity} Seats
-Facility Description: {booking.resource.description or 'Campus Academic Facility'}
+Description: {booking.resource.description or 'Campus Academic Facility'}
 Amenities: {booking.resource.amenities or 'Standard Equipment'}
 
 --- SCHEDULE & TIME SLOTS ---
@@ -54,12 +56,51 @@ You will receive an email notification as soon as the administrator approves you
 Best regards,
 CampusRMS Administration Team
 """
+        html_message = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0f172a; color: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #1e293b;">
+          <h2 style="color: #38bdf8; margin-top: 0;">Reservation Request Submitted</h2>
+          <p>Dear <strong>{booking.user.name}</strong>,</p>
+          <p>Thank you for submitting a reservation request on <strong>CampusRMS</strong>! Your request has been received and is currently pending administrator review.</p>
+          
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #38bdf8;">
+            <h3 style="color: #38bdf8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- PASS APPROVAL CODE ---</h3>
+            <p style="font-size: 18px; font-weight: bold; margin: 4px 0; color: #f8fafc;">Pass Code: <span style="color: #38bdf8;">#CRMS-PASS-{booking.id}</span></p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #94a3b8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- FACILITY & SPACE DETAILS ---</h3>
+            <p style="margin: 6px 0;"><strong>Facility Resource:</strong> {booking.resource.resource_name} ({booking.resource.resource_type})</p>
+            <p style="margin: 6px 0;"><strong>Location:</strong> {booking.resource.location or 'Campus Main Block'}</p>
+            <p style="margin: 6px 0;"><strong>Capacity:</strong> {booking.resource.capacity} Seats</p>
+            <p style="margin: 6px 0;"><strong>Description:</strong> {booking.resource.description or 'Campus Academic Facility'}</p>
+            <p style="margin: 6px 0;"><strong>Amenities:</strong> {booking.resource.amenities or 'Standard Equipment'}</p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #94a3b8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- SCHEDULE & TIME SLOTS ---</h3>
+            <p style="margin: 6px 0;"><strong>Booked Date:</strong> {booking.booking_date}</p>
+            <p style="margin: 6px 0;"><strong>Booked Time Slot:</strong> {booking.time_slot}</p>
+            <p style="margin: 6px 0;"><strong>Purpose / Activity:</strong> {booking.purpose}</p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #f59e0b; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- STATUS ---</h3>
+            <p style="margin: 6px 0; color: #fbbf24; font-weight: bold;">Current Status: Pending Approval</p>
+          </div>
+
+          <p>You will receive an email notification as soon as the administrator approves your reservation.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 0;">Best regards,<br /><strong>CampusRMS Administration Team</strong></p>
+        </div>
+        """
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@campusrms.com')
         send_mail(
             subject,
             message,
             from_email,
             [booking.user.email],
+            html_message=html_message,
             fail_silently=True,
         )
         print(f"[EMAIL NOTIFICATION] Request confirmation sent to {booking.user.email}")
@@ -108,12 +149,49 @@ When you arrive at the facility, present your Pass Approval Code (#CRMS-PASS-{bo
 Best regards,
 CampusRMS Administration Team
 """
+        html_message = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0f172a; color: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #1e293b;">
+          <h2 style="color: #10b981; margin-top: 0;">✓ Booking Approved</h2>
+          <p>Dear <strong>{booking.user.name}</strong>,</p>
+          <p>Great news! Your campus facility reservation request has been <strong>APPROVED</strong> by the System Administrator.</p>
+          
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #10b981;">
+            <h3 style="color: #10b981; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- PASS APPROVAL CODE ---</h3>
+            <p style="font-size: 18px; font-weight: bold; margin: 4px 0; color: #f8fafc;">Pass Code: <span style="color: #34d399;">#CRMS-PASS-{booking.id}</span></p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #94a3b8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- FACILITY & SPACE DETAILS ---</h3>
+            <p style="margin: 6px 0;"><strong>Facility Resource:</strong> {booking.resource.resource_name} ({booking.resource.resource_type})</p>
+            <p style="margin: 6px 0;"><strong>Location:</strong> {booking.resource.location or 'Campus Main Block'}</p>
+            <p style="margin: 6px 0;"><strong>Capacity:</strong> {booking.resource.capacity} Seats</p>
+            <p style="margin: 6px 0;"><strong>Description:</strong> {booking.resource.description or 'Campus Academic Facility'}</p>
+            <p style="margin: 6px 0;"><strong>Amenities:</strong> {booking.resource.amenities or 'Standard Equipment'}</p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #94a3b8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- SCHEDULE & TIME SLOTS ---</h3>
+            <p style="margin: 6px 0;"><strong>Booked Date:</strong> {booking.booking_date}</p>
+            <p style="margin: 6px 0;"><strong>Booked Time Slot:</strong> {booking.time_slot}</p>
+            <p style="margin: 6px 0;"><strong>Purpose / Activity:</strong> {booking.purpose}</p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #38bdf8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- CHECK-IN INSTRUCTIONS ---</h3>
+            <p style="margin: 6px 0;">When you arrive at the facility, present your Pass Approval Code (<strong>#CRMS-PASS-{booking.id}</strong>) or QR Pass to the staff member for check-in verification.</p>
+          </div>
+
+          <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 0;">Best regards,<br /><strong>CampusRMS Administration Team</strong></p>
+        </div>
+        """
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@campusrms.com')
         send_mail(
             subject,
             message,
             from_email,
             [booking.user.email],
+            html_message=html_message,
             fail_silently=True,
         )
         print(f"[EMAIL NOTIFICATION] Approval email sent to {booking.user.email}")
@@ -136,12 +214,15 @@ def send_booking_rejected_email(booking_id):
         send_realtime_notification(booking.user.id, f"Reservation REJECTED: {booking.resource.resource_name}")
 
         # 2. Dispatch email notification
-        subject = f'Booking Request Update: {booking.resource.resource_name}'
+        subject = f'Booking Request Update: {booking.resource.resource_name} (#CRMS-PASS-{booking.id})'
         message = f"""Dear {booking.user.name},
 
 Your facility reservation request for {booking.resource.resource_name} on {booking.booking_date} ({booking.time_slot}) was REJECTED by the Administrator.
 
---- RESERVATION SUMMARY ---
+--- PASS APPROVAL CODE ---
+Pass Code: #CRMS-PASS-{booking.id}
+
+--- FACILITY & SPACE DETAILS ---
 Facility Resource: {booking.resource.resource_name} ({booking.resource.resource_type})
 Location: {booking.resource.location or 'Campus Main Block'}
 Description: {booking.resource.description or 'Campus Academic Facility'}
@@ -156,12 +237,44 @@ If you have questions or require an alternative space, please submit a new reser
 Best regards,
 CampusRMS Administration Team
 """
+        html_message = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0f172a; color: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #1e293b;">
+          <h2 style="color: #f43f5e; margin-top: 0;">Booking Request Update</h2>
+          <p>Dear <strong>{booking.user.name}</strong>,</p>
+          <p>Your facility reservation request for <strong>{booking.resource.resource_name}</strong> on <strong>{booking.booking_date} ({booking.time_slot})</strong> was <strong>REJECTED</strong> by the Administrator.</p>
+          
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #f43f5e;">
+            <h3 style="color: #f43f5e; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- PASS APPROVAL CODE ---</h3>
+            <p style="font-size: 18px; font-weight: bold; margin: 4px 0; color: #f8fafc;">Pass Code: <span style="color: #fb7185;">#CRMS-PASS-{booking.id}</span></p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #94a3b8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- FACILITY & SPACE DETAILS ---</h3>
+            <p style="margin: 6px 0;"><strong>Facility Resource:</strong> {booking.resource.resource_name} ({booking.resource.resource_type})</p>
+            <p style="margin: 6px 0;"><strong>Location:</strong> {booking.resource.location or 'Campus Main Block'}</p>
+            <p style="margin: 6px 0;"><strong>Description:</strong> {booking.resource.description or 'Campus Academic Facility'}</p>
+          </div>
+
+          <div style="background-color: #1e293b; padding: 16px; border-radius: 12px; margin: 16px 0;">
+            <h3 style="color: #94a3b8; margin-top: 0; font-size: 14px; text-transform: uppercase;">--- SCHEDULE & TIME SLOTS ---</h3>
+            <p style="margin: 6px 0;"><strong>Requested Date:</strong> {booking.booking_date}</p>
+            <p style="margin: 6px 0;"><strong>Requested Time Slot:</strong> {booking.time_slot}</p>
+            <p style="margin: 6px 0;"><strong>Purpose:</strong> {booking.purpose}</p>
+          </div>
+
+          <p>If you have questions or require an alternative space, please submit a new reservation request on the CampusRMS portal.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 0;">Best regards,<br /><strong>CampusRMS Administration Team</strong></p>
+        </div>
+        """
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@campusrms.com')
         send_mail(
             subject,
             message,
             from_email,
             [booking.user.email],
+            html_message=html_message,
             fail_silently=True,
         )
         print(f"[EMAIL NOTIFICATION] Rejection email sent to {booking.user.email}")
