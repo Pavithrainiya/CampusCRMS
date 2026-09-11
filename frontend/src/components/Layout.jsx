@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AiAssistantDrawer from './AiAssistantDrawer';
+import UserAvatar from './UserAvatar';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -197,9 +198,7 @@ const Layout = ({ children }) => {
       {/* User Footer Profile */}
       <div className="p-4 border-t border-slate-800/50 bg-slate-950/20">
         <div className="flex items-center gap-3 px-2 py-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary-500 to-secondary-500 flex items-center justify-center text-white font-bold border border-slate-700/50 shadow-md">
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-          </div>
+          <UserAvatar user={user} size="md" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-slate-200 truncate">{user?.name}</p>
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary-500/10 text-primary-400 border border-primary-500/20 uppercase mt-0.5">
@@ -388,6 +387,15 @@ const Layout = ({ children }) => {
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs font-semibold uppercase tracking-wider">Active</span>
+            </div>
+
+            {/* Profile Avatar Pill */}
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-800/60">
+              <UserAvatar user={user} size="sm" />
+              <div className="hidden lg:block text-left">
+                <p className="text-xs font-semibold text-slate-200 truncate max-w-[120px]">{user?.name}</p>
+                <p className="text-[10px] text-slate-400 capitalize">{user?.role}</p>
+              </div>
             </div>
           </div>
         </header>

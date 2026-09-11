@@ -22,6 +22,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import UserAvatar from '../components/UserAvatar';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -191,17 +192,20 @@ const Dashboard = () => {
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-secondary-500/10 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/10 text-primary-400 border border-primary-500/25">
-              <Activity className="w-3.5 h-3.5 animate-pulse" />
-              Online Control Center Active
-            </span>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-100">
-              Welcome to the Control Center, <span className="text-gradient">{user?.name}</span>
-            </h1>
-            <p className="text-slate-400 max-w-xl text-sm leading-relaxed">
-              Manage facilities, inspect schedules, and book university resources seamlessly. You are logged in with <strong className="text-slate-200">{user?.role}</strong> credentials.
-            </p>
+          <div className="flex items-center gap-5">
+            <UserAvatar user={user} size="xl" />
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/10 text-primary-400 border border-primary-500/25">
+                <Activity className="w-3.5 h-3.5 animate-pulse" />
+                Online Control Center Active
+              </span>
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-100">
+                Welcome to the Control Center, <span className="text-gradient">{user?.name}</span>
+              </h1>
+              <p className="text-slate-400 max-w-xl text-sm leading-relaxed">
+                Manage facilities, inspect schedules, and book university resources seamlessly. You are logged in with <strong className="text-slate-200">{user?.role}</strong> credentials.
+              </p>
+            </div>
           </div>
           
           <div className="flex gap-3">

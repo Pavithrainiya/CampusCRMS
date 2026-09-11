@@ -17,6 +17,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import UserAvatar from '../components/UserAvatar';
 
 const Users = () => {
   const { user: currentUser } = useAuth();
@@ -235,10 +236,8 @@ const Users = () => {
                     {/* Name */}
                     <td className="px-6 py-4 font-bold text-slate-200">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-bold border border-slate-700/50">
-                          {userItem.name.charAt(0).toUpperCase()}
-                        </div>
-                        {userItem.name}
+                        <UserAvatar user={userItem} size="sm" />
+                        <span>{userItem.name}</span>
                       </div>
                     </td>
                     

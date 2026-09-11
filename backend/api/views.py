@@ -720,7 +720,7 @@ class StatsView(APIView):
 
 
 class AnalyticsView(APIView):
-    permission_classes = [IsAdminUserOnly]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         if Booking.objects.count() == 0:
@@ -734,8 +734,9 @@ class AnalyticsView(APIView):
         approved = bookings.filter(status='Approved')
         by_hour = {}
         for value in approved.values_list('time_slot', flat=True):
-            hour = value.split(' - ')[0]
-            by_hour[hour] = by_hour.get(hour, 0) + 1
+            if value and isinstance(value, str) and ' - ' in value:
+                hour = value.split(' - ')[0]
+                by_hour[hour] = by_hour.get(hour, 0) + 1
         total = bookings.count()
         checked_in = approved.filter(checked_in=True).count()
         popular = approved.values('resource__resource_name').annotate(count=Count('id')).order_by('-count')[:6]
@@ -744,6 +745,7 @@ class AnalyticsView(APIView):
             count = approved.filter(resource=resource).count()
             utilization.append({'resource_name': resource.resource_name, 'bookings': count, 'utilization_rate': round((count / max(total, 1)) * 100, 1)})
         payload = {
+            'total_bookings': total,
             'upcoming_bookings': approved.filter(booking_date__gte=today).count(),
             'past_bookings': bookings.filter(booking_date__lt=today).count(),
             'status_distribution': {state: bookings.filter(status=state).count() for state in ['Approved', 'Pending', 'Rejected', 'Cancelled']},
