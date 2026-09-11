@@ -60,8 +60,8 @@ const Register = () => {
     setIsLoading(false);
 
     if (result.success) {
-      showToast('Registration successful! Please sign in.', 'success');
-      navigate('/login');
+      showToast('Registration successful! Welcome to CampusRMS.', 'success');
+      navigate('/dashboard');
     } else {
       // Map API errors
       if (result.errors) {
@@ -72,8 +72,16 @@ const Register = () => {
         });
         setErrors(fieldErrors);
         
-        // Show general error message
-        const generalMessage = fieldErrors.non_field_errors || fieldErrors.error || 'Please correct the highlighted errors.';
+        const firstErrorKey = Object.keys(fieldErrors)[0];
+        const firstErrorVal = fieldErrors[firstErrorKey];
+        let generalMessage = 'Please correct the highlighted errors.';
+        if (fieldErrors.non_field_errors) {
+          generalMessage = fieldErrors.non_field_errors;
+        } else if (fieldErrors.error) {
+          generalMessage = fieldErrors.error;
+        } else if (firstErrorVal && typeof firstErrorVal === 'string') {
+          generalMessage = `${firstErrorKey.charAt(0).toUpperCase() + firstErrorKey.slice(1)}: ${firstErrorVal}`;
+        }
         showToast(generalMessage, 'error');
       } else {
         showToast('Registration failed.', 'error');

@@ -1,9 +1,12 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+
 import dj_database_url
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-nym6p8k@px3_wp3*e(4q(x0*w-w!cc7*7qwms*e@mu9(%_==y+')
 
@@ -109,33 +112,36 @@ CELERY_TIMEZONE = 'UTC'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
-# For production, use SMTP:
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-# EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = 'noreply@campusrms.com'
+if os.environ.get('EMAIL_HOST_USER') and os.environ.get('EMAIL_HOST_PASSWORD'):
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'noreply@campusrms.com'
 
-# Database Configuration - PostgreSQL
-# Use DATABASE_URL from environment (Render provides this automatically)
+# Database Configuration - PostgreSQL only
+# Prefer DATABASE_URL (Render/Railway/Heroku). Otherwise use DB_* env vars.
+_default_database_url = (
+    f"postgresql://{os.environ.get('DB_USER', 'postgres')}:"
+    f"{os.environ.get('DB_PASSWORD', '1234')}@"
+    f"{os.environ.get('DB_HOST', 'localhost')}:"
+    f"{os.environ.get('DB_PORT', '5432')}/"
+    f"{os.environ.get('DB_NAME', 'campusrms_db')}"
+)
 DATABASES = {
     'default': dj_database_url.config(
-        default=f"postgresql://{os.environ.get('DB_USER', 'postgres')}:{os.environ.get('DB_PASSWORD', '1234')}@{os.environ.get('DB_HOST', 'localhost')}:{os.environ.get('DB_PORT', '5432')}/{os.environ.get('DB_NAME', 'campusrms_db')}",
+        default=_default_database_url,
         conn_max_age=600,
         conn_health_checks=True,
+        ssl_require=os.environ.get('DB_SSL_REQUIRE', 'False') == 'True',
     )
 }
-
-# Backup SQLite config (switch back if needed)
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
+DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -207,7 +213,7 @@ if 'RENDER_EXTERNAL_URL' in os.environ:
 
 # Allow all Render domains in development
 if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOW_ALL_ORIGINS = True
 else:
     # In production, only allow specific origins above
     pass

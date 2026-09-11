@@ -68,7 +68,12 @@ class Resource(models.Model):
     capacity = models.PositiveIntegerField()
     location = models.CharField(max_length=255, blank=True, null=True)
     amenities = models.TextField(blank=True, null=True)  # Comma-separated tags, e.g., "Projector, Whiteboard"
+    hourly_rate = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
     availability_status = models.BooleanField(default=True)
+    image_url = models.CharField(max_length=500, blank=True, null=True)
+    dress_code = models.CharField(max_length=255, blank=True, null=True)
+    equipment_needed = models.TextField(blank=True, null=True)
+    materials_required = models.TextField(blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_resources')
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -80,6 +85,7 @@ class Booking(models.Model):
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
         ('Rejected', 'Rejected'),
+        ('Cancelled', 'Cancelled'),
     )
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='bookings')
@@ -87,8 +93,12 @@ class Booking(models.Model):
     time_slot = models.CharField(max_length=50)  # e.g., "09:00 AM - 11:00 AM"
     purpose = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
+    amount_paid = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    payment_status = models.CharField(max_length=20, default='FREE')  # FREE, COMPLETED, PENDING
     checked_in = models.BooleanField(default=False)
     check_in_time = models.DateTimeField(null=True, blank=True)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
     qr_code_data = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -151,3 +161,15 @@ class AuditLog(models.Model):
         user_email = self.user.email if self.user else "Anonymous"
         return f"{user_email} - {self.action} - {self.timestamp}"
 
+class ResourceReview(models.Model):
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    rating = models.PositiveSmallIntegerField(default=5)
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Review ({self.rating}★) for {self.resource.resource_name} by {self.user.email}"

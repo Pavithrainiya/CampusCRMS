@@ -1,16 +1,27 @@
 from django.contrib.auth import authenticate, get_user_model
 from django.db import models
+from django.db.models import Count
+from django.utils import timezone
 from rest_framework import viewsets, status, permissions, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Resource, Booking, Notification, AuditLog
-from .serializers import UserSerializer, ResourceSerializer, BookingSerializer, NotificationSerializer
-from .tasks import send_booking_approved_email, send_booking_rejected_email, send_welcome_email, send_realtime_notification
+from .models import Resource, Booking, Notification, AuditLog, ResourceReview
+from .serializers import UserSerializer, ResourceSerializer, BookingSerializer, NotificationSerializer, ResourceReviewSerializer
+from .tasks import send_booking_approved_email, send_booking_rejected_email, send_welcome_email, send_realtime_notification, send_booking_created_email, send_booking_cancelled_email
 import datetime as dt
+from io import BytesIO
+import pandas as pd
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import threading
 
+def run_async(func, *args, **kwargs):
+    """Run email/background tasks in a daemon thread so the API responds instantly."""
+    threading.Thread(target=func, args=args, kwargs=kwargs, daemon=True).start()
 
 User = get_user_model()
 
@@ -108,10 +119,19 @@ class RegisterView(APIView):
             user = serializer.save(role='Student')  # Default role is Student
             log_action(user, "Student registered account", request)
             
-            # Send welcome email asynchronously
-            send_welcome_email.delay(user.id)
+            # Send welcome email asynchronously via daemon thread
+            run_async(send_welcome_email, user.id)
             
-            return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+            # Generate JWT tokens for instant auto-login
+            refresh = RefreshToken.for_user(user)
+            user_data = UserSerializer(user).data
+            
+            return Response({
+                'user': user_data,
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'message': 'Account registered successfully!'
+            }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -127,7 +147,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
     serializer_class = ResourceSerializer
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'export_csv', 'recommendations']:
             return [permissions.IsAuthenticated()]
         return [IsStaffOrAdmin()]
 
@@ -174,6 +194,52 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=False, methods=['get'])
+    def recommendations(self, request):
+        """Rank available resources using the user's booking history and optional criteria."""
+        queryset = self.get_queryset().filter(availability_status=True)
+        min_capacity = request.query_params.get('min_capacity')
+        location = request.query_params.get('location')
+        amenities = request.query_params.get('amenities')
+        if min_capacity:
+            queryset = queryset.filter(capacity__gte=min_capacity)
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+        if amenities:
+            for amenity in amenities.split(','):
+                queryset = queryset.filter(amenities__icontains=amenity.strip())
+
+        history = Booking.objects.filter(user=request.user, status='Approved').values_list('resource_id', flat=True)
+        resources = queryset.annotate(popularity=Count('bookings')).order_by('-popularity', 'resource_name')[:10]
+        return Response([
+            {
+                **ResourceSerializer(resource).data,
+                'recommendation_reason': 'Previously booked by you' if resource.id in history else ('Popular with campus users' if resource.popularity else 'Available and matches your criteria'),
+            }
+            for resource in resources
+        ])
+
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        resources = self.get_queryset()
+        data = []
+        for r in resources:
+            data.append({
+                'ID': r.id,
+                'Resource Name': r.resource_name,
+                'Type': r.resource_type,
+                'Capacity': r.capacity,
+                'Location': r.location or '',
+                'Amenities': r.amenities or '',
+                'Status': 'Available' if r.availability_status else 'Unavailable',
+                'Avg Rating': r.reviews.aggregate(models.Avg('rating'))['rating__avg'] or 'N/A'
+            })
+        df = pd.DataFrame(data)
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="campus_resources.csv"'
+        df.to_csv(path_or_buf=response, index=False)
+        return response
+
 
 # Booking CRUD
 class BookingViewSet(viewsets.ModelViewSet):
@@ -212,6 +278,10 @@ class BookingViewSet(viewsets.ModelViewSet):
             self.perform_create(serializer)
             booking = serializer.instance
             log_action(request.user, f"Requested booking #{booking.id} for {booking.resource.resource_name}", request)
+
+            # Trigger email confirmation to student asynchronously
+            run_async(send_booking_created_email, booking.id)
+
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         
@@ -279,8 +349,53 @@ class BookingViewSet(viewsets.ModelViewSet):
         if request.user.role == 'Student' and booking.user != request.user:
             return Response({"error": "You do not have permission to delete this booking."}, status=status.HTTP_403_FORBIDDEN)
         
-        log_action(request.user, f"Cancelled booking #{booking.id}", request)
+        user_email = booking.user.email
+        user_name = booking.user.name
+        resource_name = booking.resource.resource_name
+        booking_date = str(booking.booking_date)
+        time_slot = booking.time_slot
+
+        log_action(request.user, f"Cancelled & Deleted booking #{booking.id} ({resource_name})", request)
+
+        # 1. Send Cancellation Confirmation Email to the user
+        run_async(send_booking_cancelled_email, user_email, user_name, resource_name, booking_date, time_slot)
+
+        # 2. Broadcast System Notification to ALL active users in the organization
+        broadcast_msg = f"📢 Class Slot Released: '{resource_name}' is now AVAILABLE on {booking_date} for slot {time_slot}!"
+        all_active_users = User.objects.filter(status='ACTIVE')
+        notifications = [Notification(user=u, message=broadcast_msg) for u in all_active_users]
+        Notification.objects.bulk_create(notifications)
+
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        booking = self.get_object()
+        if request.user.role == 'Student' and booking.user != request.user:
+            return Response({"error": "You do not have permission to cancel this booking."}, status=status.HTTP_403_FORBIDDEN)
+        
+        booking.status = 'Cancelled'
+        booking.cancelled_at = timezone.now()
+        booking.save()
+
+        user_email = booking.user.email
+        user_name = booking.user.name
+        resource_name = booking.resource.resource_name
+        booking_date = str(booking.booking_date)
+        time_slot = booking.time_slot
+
+        log_action(request.user, f"Cancelled booking #{booking.id} ({resource_name})", request)
+
+        # 1. Send Cancellation Confirmation Email to the user
+        run_async(send_booking_cancelled_email, user_email, user_name, resource_name, booking_date, time_slot)
+
+        # 2. Broadcast System Notification to ALL active users in the organization
+        broadcast_msg = f"📢 Class Slot Released: '{resource_name}' is now AVAILABLE on {booking_date} for slot {time_slot}!"
+        all_active_users = User.objects.filter(status='ACTIVE')
+        notifications = [Notification(user=u, message=broadcast_msg) for u in all_active_users]
+        Notification.objects.bulk_create(notifications)
+
+        return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
         booking = self.get_object()
@@ -328,8 +443,8 @@ class BookingViewSet(viewsets.ModelViewSet):
             message=f"Your booking for '{booking.resource.resource_name}' on {booking.booking_date} ({booking.time_slot}) has been Approved."
         )
         
-        # Send approval email asynchronously
-        send_booking_approved_email.delay(booking.id)
+        # Send approval email to student asynchronously
+        run_async(send_booking_approved_email, booking.id)
         
         # Send real-time notification
         send_realtime_notification(booking.user.id, f"Booking Approved: {booking.resource.resource_name}")
@@ -351,8 +466,8 @@ class BookingViewSet(viewsets.ModelViewSet):
             message=f"Your booking for '{booking.resource.resource_name}' on {booking.booking_date} ({booking.time_slot}) has been Rejected."
         )
         
-        # Send rejection email asynchronously
-        send_booking_rejected_email.delay(booking.id)
+        # Send rejection email to student asynchronously
+        run_async(send_booking_rejected_email, booking.id)
         
         # Send real-time notification
         send_realtime_notification(booking.user.id, f"Booking Rejected: {booking.resource.resource_name}")
@@ -366,13 +481,90 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({"error": "Only approved bookings can be checked in."}, status=status.HTTP_400_BAD_REQUEST)
 
         booking.checked_in = True
-        booking.check_in_time = dt.datetime.now()
+        booking.check_in_time = timezone.now()
         booking.save()
 
         # Log Action
         log_action(request.user, f"Checked-in to booking #{booking.id} ({booking.resource.resource_name})", request)
 
         return Response(BookingSerializer(booking).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        bookings = self.get_queryset()
+        data = []
+        for b in bookings:
+            data.append({
+                'Booking ID': b.id,
+                'Resource': b.resource.resource_name,
+                'User': b.user.name,
+                'User Email': b.user.email,
+                'Date': b.booking_date,
+                'Time Slot': b.time_slot,
+                'Status': b.status,
+                'Purpose': b.purpose,
+                'Checked In': 'Yes' if b.checked_in else 'No'
+            })
+        df = pd.DataFrame(data)
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="campus_bookings.csv"'
+        df.to_csv(path_or_buf=response, index=False)
+        return response
+
+    @action(detail=False, methods=['post'], permission_classes=[IsStaffOrAdmin])
+    def verify_qr(self, request):
+        """Staff-only QR verification endpoint used by a mobile scanner or manual paste."""
+        qr_data = request.data.get('qr_code_data', '').strip()
+        if not qr_data:
+            return Response({'valid': False, 'error': 'Pass code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        booking = None
+        # 1. Exact match by qr_code_data
+        booking = Booking.objects.select_related('user', 'resource').filter(qr_code_data=qr_data).first()
+        
+        # 2. Flexible lookup by numeric ID (e.g. "1", "#1", "CRMS-PASS-1", "BOOKING-1")
+        if not booking:
+            import re
+            match = re.search(r'\d+', qr_data)
+            if match:
+                booking_id = match.group(0)
+                booking = Booking.objects.select_related('user', 'resource').filter(id=booking_id).first()
+
+        if not booking:
+            return Response({'valid': False, 'error': 'Unknown pass code or reservation not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if booking.status != 'Approved':
+            return Response({'valid': False, 'error': f'Booking #{booking.id} status is {booking.status}. Only Approved reservations can check in.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if booking.checked_in:
+            return Response({
+                'valid': False, 
+                'error': f'Booking #{booking.id} was already checked in at {booking.check_in_time.strftime("%I:%M %p") if booking.check_in_time else "earlier time"}.',
+                'booking': BookingSerializer(booking, context={'request': request}).data
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        booking.checked_in = True
+        booking.check_in_time = timezone.now()
+        booking.save(update_fields=['checked_in', 'check_in_time'])
+        log_action(request.user, f"Verified QR check-in for booking #{booking.id}", request)
+        return Response({'valid': True, 'booking': BookingSerializer(booking, context={'request': request}).data})
+
+    @action(detail=True, methods=['post'])
+    def extend(self, request, pk=None):
+        """Extend an approved booking into the immediately following configured slot."""
+        booking = self.get_object()
+        if booking.user != request.user and request.user.role not in ['Staff', 'Admin']:
+            return Response({'error': 'You cannot extend this booking.'}, status=status.HTTP_403_FORBIDDEN)
+        slots = ['09:00 AM - 10:00 AM', '10:00 AM - 11:00 AM', '11:00 AM - 12:00 PM', '12:00 PM - 01:00 PM', '01:00 PM - 02:00 PM', '02:00 PM - 03:00 PM', '03:00 PM - 04:00 PM', '04:00 PM - 05:00 PM', '05:00 PM - 06:00 PM']
+        try:
+            next_slot = slots[slots.index(booking.time_slot) + 1]
+        except (ValueError, IndexError):
+            return Response({'error': 'No later slot is available for an extension.'}, status=status.HTTP_400_BAD_REQUEST)
+        if Booking.objects.filter(resource=booking.resource, booking_date=booking.booking_date, time_slot=next_slot, status='Approved').exists():
+            return Response({'error': 'The next slot is already booked.'}, status=status.HTTP_400_BAD_REQUEST)
+        booking.time_slot = next_slot
+        booking.save(update_fields=['time_slot'])
+        return Response(BookingSerializer(booking, context={'request': request}).data)
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
@@ -457,7 +649,7 @@ class StatsView(APIView):
                 'live_occupancy': live_occupancy,
                 'chart_data': chart_data
             }, status=status.HTTP_200_OK)
- 
+
         elif user.role == 'Staff':
             total_resources = Resource.objects.count()
             total_bookings = Booking.objects.count()
@@ -471,7 +663,7 @@ class StatsView(APIView):
                 'live_occupancy': live_occupancy,
                 'chart_data': chart_data
             }, status=status.HTTP_200_OK)
- 
+
         else:
             # Student Dashboard
             my_bookings = Booking.objects.filter(user=user).count()
@@ -489,3 +681,80 @@ class StatsView(APIView):
                 'chart_data': chart_data
             }, status=status.HTTP_200_OK)
 
+
+class AnalyticsView(APIView):
+    permission_classes = [IsAdminUserOnly]
+
+    def get(self, request):
+        today = timezone.localdate()
+        bookings = Booking.objects.all()
+        approved = bookings.filter(status='Approved')
+        by_hour = {}
+        for value in approved.values_list('time_slot', flat=True):
+            hour = value.split(' - ')[0]
+            by_hour[hour] = by_hour.get(hour, 0) + 1
+        total = bookings.count()
+        checked_in = approved.filter(checked_in=True).count()
+        popular = approved.values('resource__resource_name').annotate(count=Count('id')).order_by('-count')[:6]
+        utilization = []
+        for resource in Resource.objects.all():
+            count = approved.filter(resource=resource).count()
+            utilization.append({'resource_name': resource.resource_name, 'bookings': count, 'utilization_rate': round((count / max(total, 1)) * 100, 1)})
+        payload = {
+            'upcoming_bookings': approved.filter(booking_date__gte=today).count(),
+            'past_bookings': bookings.filter(booking_date__lt=today).count(),
+            'status_distribution': {state: bookings.filter(status=state).count() for state in ['Approved', 'Pending', 'Rejected', 'Cancelled']},
+            'peak_hours': [{'time_slot': slot, 'count': count} for slot, count in sorted(by_hour.items())],
+            'popular_resources': list(popular),
+            'resource_utilization': sorted(utilization, key=lambda row: row['utilization_rate'], reverse=True),
+            'no_show_rate': round(((approved.count() - checked_in) / max(approved.count(), 1)) * 100, 1),
+            'bookings_by_day': [{'date': str(today - dt.timedelta(days=offset)), 'count': bookings.filter(booking_date=today - dt.timedelta(days=offset)).count()} for offset in range(6, -1, -1)],
+        }
+        report_format = request.query_params.get('format')
+        if report_format == 'xlsx':
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                pd.DataFrame(payload['resource_utilization']).to_excel(writer, sheet_name='Utilization', index=False)
+                pd.DataFrame(payload['popular_resources']).to_excel(writer, sheet_name='Popular resources', index=False)
+                pd.DataFrame(payload['peak_hours']).to_excel(writer, sheet_name='Peak hours', index=False)
+            response = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="campusrms-analytics.xlsx"'
+            return response
+        if report_format == 'pdf':
+            output = BytesIO()
+            pdf = canvas.Canvas(output, pagesize=letter)
+            pdf.setTitle('CampusRMS Analytics Report')
+            pdf.setFont('Helvetica-Bold', 16)
+            pdf.drawString(54, 750, 'CampusRMS Analytics Report')
+            pdf.setFont('Helvetica', 10)
+            y = 720
+            for label, value in [('Upcoming bookings', payload['upcoming_bookings']), ('Past bookings', payload['past_bookings']), ('No-show rate', f"{payload['no_show_rate']}%")]:
+                pdf.drawString(54, y, f'{label}: {value}')
+                y -= 20
+            pdf.setFont('Helvetica-Bold', 11)
+            pdf.drawString(54, y - 8, 'Most popular resources')
+            pdf.setFont('Helvetica', 10)
+            y -= 28
+            for item in payload['popular_resources']:
+                pdf.drawString(54, y, f"{item['resource__resource_name']}: {item['count']} bookings")
+                y -= 16
+            pdf.save()
+            response = HttpResponse(output.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="campusrms-analytics.pdf"'
+            return response
+        return Response(payload)
+
+
+class ResourceReviewViewSet(viewsets.ModelViewSet):
+    serializer_class = ResourceReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = ResourceReview.objects.all().order_by('-created_at')
+        resource_id = self.request.query_params.get('resource')
+        if resource_id:
+            queryset = queryset.filter(resource_id=resource_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

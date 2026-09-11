@@ -2,32 +2,49 @@ from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from .models import Booking, User, Notification
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
+
+def booking_start(booking):
+    """Return an aware start datetime for the standard booking slot format."""
+    start_text = booking.time_slot.split(' - ')[0].strip()
+    start_time = datetime.strptime(start_text, '%I:%M %p').time()
+    return timezone.make_aware(datetime.combine(booking.booking_date, start_time))
+
 @shared_task
-def send_booking_approved_email(booking_id):
-    """Send email when booking is approved"""
+def send_booking_created_email(booking_id):
+    """Send confirmation email when a student submits a new booking request"""
     try:
-        booking = Booking.objects.get(id=booking_id)
-        subject = f'Booking Approved - {booking.resource.resource_name}'
-        message = f"""
-Dear {booking.user.name},
+        booking = Booking.objects.select_related('user', 'resource').get(id=booking_id)
+        subject = f'Reservation Request Submitted: {booking.resource.resource_name}'
+        message = f"""Dear {booking.user.name},
 
-Your booking has been approved!
+Thank you for submitting a reservation request on CampusRMS! Your request has been received and is currently pending administrator review.
 
-Resource: {booking.resource.resource_name}
-Date: {booking.booking_date}
-Time: {booking.time_slot}
-Purpose: {booking.purpose}
+--- RESERVATION SUMMARY ---
+Request Pass Code: #CRMS-PASS-{booking.id}
+Facility Resource: {booking.resource.resource_name} ({booking.resource.resource_type})
+Location: {booking.resource.location or 'Campus Main Block'}
+Capacity: {booking.resource.capacity} Seats
+Facility Description: {booking.resource.description or 'Campus Academic Facility'}
+Amenities: {booking.resource.amenities or 'Standard Equipment'}
 
-Please check-in at the scheduled time.
+--- SCHEDULE & TIME SLOTS ---
+Booked Date: {booking.booking_date}
+Booked Time Slot: {booking.time_slot}
+Purpose / Activity: {booking.purpose}
+
+--- STATUS ---
+Current Status: Pending Approval
+
+You will receive an email notification as soon as the administrator approves your reservation.
 
 Best regards,
-CampusRMS Team
-        """
+CampusRMS Administration Team
+"""
         send_mail(
             subject,
             message,
@@ -35,30 +52,77 @@ CampusRMS Team
             [booking.user.email],
             fail_silently=False,
         )
-        return f"Email sent to {booking.user.email}"
+        return f"Request confirmation email sent to {booking.user.email}"
     except Exception as e:
-        return f"Failed to send email: {str(e)}"
+        return f"Failed to send request confirmation email: {str(e)}"
+
+@shared_task
+def send_booking_approved_email(booking_id):
+    """Send email when booking is approved by Admin"""
+    try:
+        booking = Booking.objects.select_related('user', 'resource').get(id=booking_id)
+        subject = f'✓ Booking Approved: {booking.resource.resource_name} (#CRMS-PASS-{booking.id})'
+        message = f"""Dear {booking.user.name},
+
+Great news! Your campus facility reservation request has been APPROVED by the System Administrator.
+
+--- PASS APPROVAL CODE ---
+Pass Code: #CRMS-PASS-{booking.id}
+
+--- FACILITY & SPACE DETAILS ---
+Facility Resource: {booking.resource.resource_name} ({booking.resource.resource_type})
+Location: {booking.resource.location or 'Campus Main Block'}
+Capacity: {booking.resource.capacity} Seats
+Description: {booking.resource.description or 'Campus Academic Facility'}
+Amenities: {booking.resource.amenities or 'Standard Equipment'}
+
+--- SCHEDULE & TIME SLOTS ---
+Booked Date: {booking.booking_date}
+Booked Time Slot: {booking.time_slot}
+Purpose / Activity: {booking.purpose}
+
+--- CHECK-IN INSTRUCTIONS ---
+When you arrive at the facility, present your Pass Approval Code (#CRMS-PASS-{booking.id}) or QR Pass to the staff member for check-in verification.
+
+Best regards,
+CampusRMS Administration Team
+"""
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [booking.user.email],
+            fail_silently=False,
+        )
+        return f"Approval email sent successfully to {booking.user.email}"
+    except Exception as e:
+        return f"Failed to send email to student: {str(e)}"
 
 @shared_task
 def send_booking_rejected_email(booking_id):
-    """Send email when booking is rejected"""
+    """Send email when booking is rejected by Admin"""
     try:
-        booking = Booking.objects.get(id=booking_id)
-        subject = f'Booking Rejected - {booking.resource.resource_name}'
-        message = f"""
-Dear {booking.user.name},
+        booking = Booking.objects.select_related('user', 'resource').get(id=booking_id)
+        subject = f'Booking Request Update: {booking.resource.resource_name}'
+        message = f"""Dear {booking.user.name},
 
-Unfortunately, your booking request has been rejected.
+Your facility reservation request for {booking.resource.resource_name} on {booking.booking_date} ({booking.time_slot}) was REJECTED by the Administrator.
 
-Resource: {booking.resource.resource_name}
-Date: {booking.booking_date}
-Time: {booking.time_slot}
+--- RESERVATION SUMMARY ---
+Facility Resource: {booking.resource.resource_name} ({booking.resource.resource_type})
+Location: {booking.resource.location or 'Campus Main Block'}
+Description: {booking.resource.description or 'Campus Academic Facility'}
 
-Please contact the admin for more information or try booking a different time slot.
+--- SCHEDULE & TIME SLOTS ---
+Requested Date: {booking.booking_date}
+Requested Time Slot: {booking.time_slot}
+Purpose: {booking.purpose}
+
+If you have questions or require an alternative space, please submit a new reservation request on the CampusRMS portal.
 
 Best regards,
-CampusRMS Team
-        """
+CampusRMS Administration Team
+"""
         send_mail(
             subject,
             message,
@@ -66,22 +130,19 @@ CampusRMS Team
             [booking.user.email],
             fail_silently=False,
         )
-        return f"Email sent to {booking.user.email}"
+        return f"Rejection email sent to {booking.user.email}"
     except Exception as e:
-        return f"Failed to send email: {str(e)}"
+        return f"Failed to send email to student: {str(e)}"
 
 @shared_task
 def send_booking_reminders():
     """Send reminders for bookings happening in next hour"""
     now = timezone.now()
-    one_hour_later = now + timedelta(hours=1)
-    
-    # Get approved bookings for today that haven't been checked in
-    today = now.date()
+    one_hour_later = now + timedelta(hours=1, minutes=5)
     bookings = Booking.objects.filter(
-        booking_date=today,
         status='Approved',
-        checked_in=False
+        checked_in=False,
+        reminder_sent_at__isnull=True,
     )
     
     count = 0
@@ -89,9 +150,9 @@ def send_booking_reminders():
         # Parse time slot to check if it's within next hour
         # Format: "09:00 AM - 11:00 AM"
         try:
-            start_time_str = booking.time_slot.split(' - ')[0]
-            # Simple check: send reminder for all today's bookings
-            # In production, you'd parse the time properly
+            starts_at = booking_start(booking)
+            if not now <= starts_at <= one_hour_later:
+                continue
             
             subject = f'Reminder: Booking at {booking.time_slot}'
             message = f"""
@@ -126,6 +187,8 @@ CampusRMS Team
             
             # Send WebSocket notification
             send_realtime_notification(booking.user.id, f"Reminder: Booking at {booking.time_slot}")
+            booking.reminder_sent_at = now
+            booking.save(update_fields=['reminder_sent_at'])
             
             count += 1
         except Exception as e:
@@ -139,24 +202,27 @@ def auto_cancel_late_bookings():
     """Auto-cancel bookings if user hasn't checked in 15 mins after start time"""
     now = timezone.now()
     grace_period = now - timedelta(minutes=15)
-    
-    # Get approved bookings that should have started but no check-in
-    today = now.date()
     late_bookings = Booking.objects.filter(
-        booking_date=today,
         status='Approved',
         checked_in=False,
-        # Add more sophisticated time checking in production
     )
     
     count = 0
     for booking in late_bookings:
-        # In production, parse time_slot and check if grace period has passed
-        # For now, we'll skip auto-cancellation to avoid false positives
-        # booking.status = 'Rejected'
-        # booking.save()
-        # count += 1
-        pass
+        try:
+            if booking_start(booking) > grace_period:
+                continue
+            booking.status = 'Cancelled'
+            booking.cancelled_at = now
+            booking.save(update_fields=['status', 'cancelled_at'])
+            Notification.objects.create(
+                user=booking.user,
+                message=f"Your booking for {booking.resource.resource_name} was cancelled because no check-in was recorded within 15 minutes."
+            )
+            send_realtime_notification(booking.user.id, f"Booking cancelled: {booking.resource.resource_name}")
+            count += 1
+        except (ValueError, IndexError):
+            continue
     
     return f"Auto-cancelled {count} late bookings"
 
@@ -258,3 +324,30 @@ def send_realtime_notification(user_id, message):
         )
     except Exception as e:
         print(f"Error sending realtime notification: {str(e)}")
+
+@shared_task
+def send_booking_cancelled_email(user_email, user_name, resource_name, booking_date, time_slot):
+    """Send cancellation confirmation email to user when a booking is cancelled/deleted"""
+    try:
+        subject = f'Reservation Cancelled: {resource_name}'
+        message = f"""Dear {user_name},
+
+Your facility reservation for {resource_name} on {booking_date} ({time_slot}) has been CANCELLED as requested.
+
+The reserved time slot has been released back to the campus schedule and is now available for other students and faculty.
+
+If this was done in error or if you need to schedule another space, you can submit a new booking anytime on the CampusRMS portal.
+
+Best regards,
+CampusRMS Administration Team
+"""
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user_email],
+            fail_silently=False,
+        )
+        return f"Cancellation email sent to {user_email}"
+    except Exception as e:
+        return f"Failed to send cancellation email: {str(e)}"

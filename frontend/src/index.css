@@ -33,8 +33,28 @@
   @apply bg-slate-900/50 backdrop-blur-lg border border-slate-800/50 hover:border-primary-500/30 transition-all duration-300 shadow-xl;
 }
 
+.glass-panel label {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+.glass-panel input, 
+.glass-panel textarea, 
+.glass-panel select {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  background-color: rgba(2, 6, 23, 0.95) !important;
+  border-color: rgba(51, 65, 85, 0.8) !important;
+}
+
+.glass-panel input::placeholder,
+.glass-panel textarea::placeholder {
+  color: rgba(148, 163, 184, 0.8) !important;
+  font-weight: 600 !important;
+}
+
 .glass-input {
-  @apply bg-slate-950/50 border border-slate-800 focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/30 focus:outline-none transition-all duration-300 placeholder:text-slate-500;
+  @apply bg-slate-950 border border-slate-700 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 focus:outline-none transition-all duration-200 text-white font-extrabold placeholder:text-slate-400;
 }
 
 /* Soft Radial Backdrop Gradients */
@@ -63,3 +83,163 @@
 }
 
 
+/* FullCalendar Dark Theme Styles */
+.fc { color: #e5e7eb !important; }
+.fc .fc-button { background-color: #6366f1 !important; border-color: #6366f1 !important; color: white !important; }
+.fc .fc-button:hover { background-color: #4f46e5 !important; }
+.fc .fc-button-primary:not(:disabled).fc-button-active { background-color: #4f46e5 !important; }
+.fc-theme-standard td, .fc-theme-standard th { border-color: #374151 !important; }
+.fc-theme-standard .fc-scrollgrid { border-color: #374151 !important; }
+.fc .fc-col-header-cell-cushion { color: #e5e7eb !important; }
+.fc .fc-daygrid-day-number { color: #e5e7eb !important; }
+.fc .fc-day-today { background-color: rgba(99, 102, 241, 0.1) !important; }
+.fc-col-header-cell { background-color: rgba(31, 41, 55, 0.8) !important; }
+.fc-daygrid-day { cursor: pointer; }
+.fc-daygrid-day:hover { background-color: rgba(99, 102, 241, 0.05) !important; }
+.fc-h-event { border-color: transparent !important; cursor: pointer; }
+
+/* Appetising Pastel Light Theme Overrides */
+html.light-mode body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .bg-radial-gradient {
+  background: radial-gradient(circle at 10% 10%, rgba(224, 231, 255, 0.65), transparent 45%),
+              radial-gradient(circle at 90% 20%, rgba(243, 232, 255, 0.65), transparent 45%),
+              radial-gradient(circle at 50% 85%, rgba(220, 252, 231, 0.5), transparent 50%),
+              #f8fafc !important;
+}
+
+html.light-mode .glass-panel {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 10px 30px -5px rgba(99, 102, 241, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .glass-card {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 8px 24px -4px rgba(139, 92, 246, 0.06) !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .glass-card:hover {
+  border-color: rgba(167, 139, 250, 0.6) !important;
+  box-shadow: 0 14px 32px -4px rgba(139, 92, 246, 0.12) !important;
+}
+
+html.light-mode .glass-input {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .glass-input:focus {
+  border-color: #a78bfa !important;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2) !important;
+}
+
+html.light-mode select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light-mode .bg-slate-900,
+html.light-mode .bg-slate-900\/30,
+html.light-mode .bg-slate-900\/40,
+html.light-mode .bg-slate-900\/50,
+html.light-mode .bg-slate-900\/60,
+html.light-mode .bg-slate-900\/80 {
+  background-color: rgba(248, 250, 252, 0.9) !important;
+}
+
+html.light-mode .bg-slate-950,
+html.light-mode .bg-slate-950\/20,
+html.light-mode .bg-slate-950\/40,
+html.light-mode .bg-slate-950\/60 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+html.light-mode .border-slate-800,
+html.light-mode .border-slate-800\/40,
+html.light-mode .border-slate-800\/50,
+html.light-mode .border-slate-800\/60,
+html.light-mode .border-slate-800\/80,
+html.light-mode .border-slate-700 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light-mode .text-slate-100,
+html.light-mode .text-slate-200 {
+  color: #0f172a !important;
+}
+
+html.light-mode .text-slate-300,
+html.light-mode .text-slate-400 {
+  color: #334155 !important;
+}
+
+html.light-mode .text-slate-500,
+html.light-mode .text-slate-600 {
+  color: #64748b !important;
+}
+
+/* Pastel Badge Accents */
+html.light-mode .bg-emerald-500\/10 {
+  background-color: #dcfce7 !important;
+}
+html.light-mode .text-emerald-400 {
+  color: #15803d !important;
+}
+html.light-mode .border-emerald-500\/20,
+html.light-mode .border-emerald-500\/30 {
+  border-color: #bbf7d0 !important;
+}
+
+html.light-mode .bg-rose-500\/10 {
+  background-color: #ffe4e6 !important;
+}
+html.light-mode .text-rose-400 {
+  color: #be123c !important;
+}
+html.light-mode .border-rose-500\/20,
+html.light-mode .border-rose-500\/30 {
+  border-color: #fecdd3 !important;
+}
+
+html.light-mode .bg-amber-500\/10 {
+  background-color: #fef3c7 !important;
+}
+html.light-mode .text-amber-400 {
+  color: #b45309 !important;
+}
+html.light-mode .border-amber-500\/20,
+html.light-mode .border-amber-500\/30 {
+  border-color: #fde68a !important;
+}
+
+html.light-mode .bg-primary-500\/10,
+html.light-mode .bg-primary-500\/15 {
+  background-color: #e0e7ff !important;
+}
+html.light-mode .text-primary-400 {
+  color: #4f46e5 !important;
+}
+html.light-mode .border-primary-500\/20,
+html.light-mode .border-primary-500\/30 {
+  border-color: #c7d2fe !important;
+}
+
+html.light-mode .btn-secondary {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+html.light-mode .btn-secondary:hover {
+  background-color: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}

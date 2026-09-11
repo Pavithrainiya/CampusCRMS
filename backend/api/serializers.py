@@ -1,8 +1,9 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from api.models import Resource, Booking, Notification
 import re
 import datetime as dt
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from api.models import Resource, Booking, Notification, ResourceReview
+from django.db.models import Avg
 
 User = get_user_model()
 
@@ -67,16 +68,37 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
 
 
+class ResourceReviewSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = ResourceReview
+        fields = ('id', 'resource', 'user', 'user_name', 'user_email', 'rating', 'comment', 'created_at')
+        read_only_fields = ('id', 'user', 'created_at')
+
+
 class ResourceSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.name', read_only=True)
     created_by_email = serializers.CharField(source='created_by.email', read_only=True)
+    avg_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    reviews = ResourceReviewSerializer(many=True, read_only=True)
 
     class Meta:
         model = Resource
         fields = ('id', 'resource_name', 'resource_type', 'description', 'capacity', 
-                  'location', 'amenities', 'availability_status', 'created_by', 
-                  'created_by_name', 'created_by_email', 'created_at')
+                  'location', 'amenities', 'hourly_rate', 'availability_status', 
+                  'image_url', 'dress_code', 'equipment_needed', 'materials_required',
+                  'created_by', 'created_by_name', 'created_by_email', 'avg_rating', 'review_count', 'reviews', 'created_at')
         read_only_fields = ('id', 'created_by', 'created_at')
+
+    def get_avg_rating(self, obj):
+        res = obj.reviews.aggregate(Avg('rating'))['rating__avg']
+        return round(res, 1) if res else 0.0
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -86,21 +108,22 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at')
 
 
-
 class BookingSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.name', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     resource_name = serializers.CharField(source='resource.resource_name', read_only=True)
     resource_type = serializers.CharField(source='resource.resource_type', read_only=True)
     resource_location = serializers.CharField(source='resource.location', read_only=True)
+    resource_hourly_rate = serializers.DecimalField(source='resource.hourly_rate', max_digits=8, decimal_places=2, read_only=True)
     qr_code_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = ('id', 'user', 'resource', 'booking_date', 'time_slot', 'purpose', 'status', 
-                  'user_name', 'user_email', 'resource_name', 'resource_type', 'resource_location', 
-                  'checked_in', 'check_in_time', 'qr_code_url', 'qr_code_data', 'created_at')
-        read_only_fields = ('id', 'user', 'status', 'checked_in', 'check_in_time', 'qr_code_url', 'qr_code_data', 'created_at')
+                  'user_name', 'user_email', 'resource_name', 'resource_type', 'resource_location', 'resource_hourly_rate',
+                  'amount_paid', 'payment_status',
+                  'checked_in', 'check_in_time', 'reminder_sent_at', 'cancelled_at', 'qr_code_url', 'qr_code_data', 'created_at')
+        read_only_fields = ('id', 'user', 'status', 'checked_in', 'check_in_time', 'reminder_sent_at', 'cancelled_at', 'qr_code_url', 'qr_code_data', 'created_at')
     
     def get_qr_code_url(self, obj):
         if obj.qr_code:
@@ -135,11 +158,8 @@ class BookingSerializer(serializers.ModelSerializer):
         # 2. Cannot book past time slots
         if booking_date and booking_date == today and time_slot:
             try:
-                # Expected format: "HH:MM AM/PM - HH:MM AM/PM"
                 start_time_str = time_slot.split('-')[0].strip()
                 start_time = dt.datetime.strptime(start_time_str, "%I:%M %p").time()
-                
-                # Check current time
                 current_time = dt.datetime.now().time()
                 
                 if current_time >= start_time:
@@ -147,18 +167,37 @@ class BookingSerializer(serializers.ModelSerializer):
             except ValueError:
                 raise serializers.ValidationError({"time_slot": "Time slot must be in the format 'HH:MM AM/PM - HH:MM AM/PM'."})
 
-        # 3. Prevent double booking of same resource in same time slot (only check Approved bookings)
+        # 3. Prevent double booking of same resource in same time slot (check Approved & Pending bookings)
         if resource and booking_date and time_slot:
             overlapping_resource_bookings = Booking.objects.filter(
                 resource=resource,
                 booking_date=booking_date,
                 time_slot=time_slot,
-                status='Approved'
+                status__in=['Approved', 'Pending']
             )
             if self.instance:
                 overlapping_resource_bookings = overlapping_resource_bookings.exclude(pk=self.instance.pk)
             if overlapping_resource_bookings.exists():
-                raise serializers.ValidationError({"resource": "This resource is already booked for the selected date and time slot."})
+                existing_b = overlapping_resource_bookings.first()
+                all_slots = [
+                    '09:00 AM - 11:00 AM',
+                    '11:00 AM - 01:00 PM',
+                    '01:00 PM - 03:00 PM',
+                    '03:00 PM - 05:00 PM',
+                    '05:00 PM - 07:00 PM'
+                ]
+                taken_slots = Booking.objects.filter(
+                    resource=resource,
+                    booking_date=booking_date,
+                    status__in=['Approved', 'Pending']
+                ).values_list('time_slot', flat=True)
+                
+                alt_slots = [s for s in all_slots if s not in taken_slots]
+                
+                raise serializers.ValidationError({
+                    "resource": f"This facility is already reserved for {booking_date} at {time_slot} (Status: {existing_b.status}). Please choose an alternative time slot or date.",
+                    "alternative_slots": alt_slots
+                })
 
         # 4. Prevent user booking multiple resources in same time slot (only check Approved bookings)
         if user and booking_date and time_slot:

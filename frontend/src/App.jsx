@@ -12,7 +12,9 @@ import Dashboard from './pages/Dashboard';
 import Resources from './pages/Resources';
 import Bookings from './pages/Bookings';
 import Users from './pages/Users';
+import QrScanner from './pages/QrScanner';
 import Calendar from './pages/Calendar';
+import Analytics from './pages/Analytics';
 
 function App() {
   return (
@@ -50,15 +52,7 @@ function App() {
                   </Layout>
                 }
               />
-              <Route
-                path="/calendar"
-                element={
-                  <Layout>
-                    <Calendar />
-                  </Layout>
-                }
-              />
-
+              <Route path="/calendar" element={<Layout><Calendar /></Layout>} />
               {/* Admin Access Only */}
               <Route element={<RoleRoute allowedRoles={['Admin']} />}>
                 <Route
@@ -69,6 +63,10 @@ function App() {
                     </Layout>
                   }
                 />
+                <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={['Staff', 'Admin']} />}>
+                <Route path="/scan" element={<Layout><QrScanner /></Layout>} />
               </Route>
             </Route>
 

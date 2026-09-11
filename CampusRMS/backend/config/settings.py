@@ -2,7 +2,11 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
+import dj_database_url
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-nym6p8k@px3_wp3*e(4q(x0*w-w!cc7*7qwms*e@mu9(%_==y+'
 
@@ -74,17 +78,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Railway MySQL Database Configuration
+# PostgreSQL (DATABASE_URL or DB_* env vars)
+_default_database_url = (
+    f"postgresql://{os.environ.get('DB_USER', 'postgres')}:"
+    f"{os.environ.get('DB_PASSWORD', '1234')}@"
+    f"{os.environ.get('DB_HOST', 'localhost')}:"
+    f"{os.environ.get('DB_PORT', '5432')}/"
+    f"{os.environ.get('DB_NAME', 'campusrms_db')}"
+)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('MYSQL_DATABASE', 'crmss'),
-        'USER': os.environ.get('MYSQLUSER', 'root'),
-        'PASSWORD': os.environ.get('MYSQLPASSWORD', ''),
-        'HOST': os.environ.get('MYSQLHOST', 'localhost'),
-        'PORT': os.environ.get('MYSQLPORT', '3306'),
-    }
+    'default': dj_database_url.config(
+        default=_default_database_url,
+        conn_max_age=600,
+        conn_health_checks=True,
+        ssl_require=os.environ.get('DB_SSL_REQUIRE', 'False') == 'True',
+    )
 }
+DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
 
 AUTH_PASSWORD_VALIDATORS = [
     {

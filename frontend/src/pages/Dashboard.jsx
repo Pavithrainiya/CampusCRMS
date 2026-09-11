@@ -13,7 +13,13 @@ import {
   BookMarked,
   Activity,
   ArrowRight,
-  Download
+  Download,
+  Star,
+  MessageSquare,
+  Ticket,
+  Sparkles,
+  Zap,
+  TrendingDown
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -24,15 +30,33 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [liveOccupancy, setLiveOccupancy] = useState([]);
   const [chartData, setChartData] = useState([]);
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [recentApproved, setRecentApproved] = useState([]);
+  const [recentRejected, setRecentRejected] = useState([]);
+  const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [offPeakSlots, setOffPeakSlots] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await API.get('/admin/stats');
-        setStats(response.data.stats);
-        setLiveOccupancy(response.data.live_occupancy || []);
-        setChartData(response.data.chart_data || []);
+        const [statsRes, bookingsRes, reviewsRes, aiRecRes, offPeakRes] = await Promise.all([
+          API.get('/admin/stats'),
+          API.get('/bookings'),
+          API.get('/reviews'),
+          API.get('/ai/recommendations').catch(() => ({ data: { recommendations: [] } })),
+          API.get('/ai/offpeak').catch(() => ({ data: { off_peak_slots: [] } }))
+        ]);
+        setStats(statsRes.data.stats);
+        setLiveOccupancy(statsRes.data.live_occupancy || []);
+        setChartData(statsRes.data.chart_data || []);
+
+        const allB = Array.isArray(bookingsRes.data) ? bookingsRes.data : [];
+        setRecentApproved(allB.filter(b => b.status === 'Approved').slice(0, 4));
+        setRecentRejected(allB.filter(b => b.status === 'Rejected').slice(0, 4));
+        setRecentReviews(Array.isArray(reviewsRes.data) ? reviewsRes.data.slice(0, 6) : []);
+        setAiRecommendations(aiRecRes.data.recommendations?.slice(0, 3) || []);
+        setOffPeakSlots(offPeakRes.data.off_peak_slots?.slice(0, 4) || []);
       } catch (error) {
         showToast('Failed to load dashboard statistics', 'error');
       } finally {
@@ -134,6 +158,29 @@ const Dashboard = () => {
     }
   };
 
+  const getCardDestination = (key) => {
+    switch (key) {
+      case 'total_users':
+        return { to: '/users' };
+      case 'total_resources':
+        return { to: '/resources' };
+      case 'total_bookings':
+        return { to: '/bookings', state: { statusFilter: 'all', filterType: 'all' } };
+      case 'pending_bookings':
+        return { to: '/bookings', state: { statusFilter: 'Pending', filterType: 'all' } };
+      case 'approved_bookings':
+        return { to: '/bookings', state: { statusFilter: 'Approved', filterType: 'all' } };
+      case 'rejected_bookings':
+        return { to: '/bookings', state: { statusFilter: 'Rejected', filterType: 'all' } };
+      case 'my_bookings':
+        return { to: '/bookings', state: { statusFilter: 'all', filterType: 'all' } };
+      case 'upcoming_bookings':
+        return { to: '/bookings', state: { filterType: 'upcoming', statusFilter: 'all' } };
+      default:
+        return null;
+    }
+  };
+
   const maxChartCount = chartData.length > 0 ? Math.max(...chartData.map(c => c.count)) : 1;
 
   return (
@@ -188,10 +235,13 @@ const Dashboard = () => {
               icon: <CalendarDays className="w-6 h-6 text-slate-400" />,
               bg: 'from-slate-500/10 to-slate-600/5 border-slate-500/20'
             };
+            const navInfo = getCardDestination(key);
+            const CardWrapper = navInfo ? Link : 'div';
             return (
-              <div 
+              <CardWrapper 
                 key={key} 
-                className={`glass-card p-6 rounded-xl border bg-gradient-to-br ${card.bg} flex items-center justify-between shadow-lg`}
+                {...(navInfo ? { to: navInfo.to, state: navInfo.state, title: `View ${card.label.toLowerCase()}` } : {})}
+                className={`glass-card p-6 rounded-xl border bg-gradient-to-br ${card.bg} flex items-center justify-between shadow-lg ${navInfo ? 'cursor-pointer hover:scale-[1.02] hover:border-primary-400/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary-400' : ''}`}
               >
                 <div className="space-y-1">
                   <span className="text-sm font-medium text-slate-400 block">{card.label}</span>
@@ -200,9 +250,94 @@ const Dashboard = () => {
                 <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-800/40 shadow-inner">
                   {card.icon}
                 </div>
-              </div>
+              </CardWrapper>
             );
           })}
+        </div>
+      </div>
+
+      {/* AI Intelligence Suite Preview Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recommended Facilities Widget */}
+        <div className="glass-panel p-6 rounded-xl border border-primary-500/30 bg-gradient-to-br from-primary-950/20 to-slate-900 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+              <h3 className="text-base font-extrabold text-white">AI Recommended Facilities</h3>
+            </div>
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-300 border border-primary-500/30 uppercase">
+              RAG MATCHED
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {aiRecommendations.length === 0 ? (
+              <div className="text-center py-6 text-white text-xs font-extrabold">Loading AI matches...</div>
+            ) : (
+              aiRecommendations.map((rec) => (
+                <div key={rec.id} className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-950/60 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-white">{rec.name}</h4>
+                    <span className="text-[10px] font-extrabold text-slate-300">{rec.type} • Capacity {rec.capacity}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      ⚡ {rec.suitability_score}% Match
+                    </span>
+                    <Link
+                      to="/bookings"
+                      state={{ prefillResource: rec.id }}
+                      className="px-3 py-1 rounded-lg bg-primary-600 text-white font-extrabold text-[10px] hover:bg-primary-500 transition"
+                    >
+                      Book
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Smart Off-Peak Optimizer Widget */}
+        <div className="glass-panel p-6 rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-950/20 to-slate-900 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-5 h-5 text-teal-300" />
+              <h3 className="text-base font-extrabold text-white">Smart Off-Peak Slot Optimizer</h3>
+            </div>
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 uppercase">
+              LOW CONGESTION
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {offPeakSlots.length === 0 ? (
+              <div className="col-span-2 text-center py-6 text-white text-xs font-extrabold">Loading off-peak windows...</div>
+            ) : (
+              offPeakSlots.map((slot, idx) => (
+                <div key={idx} className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-white">{slot.slot}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
+                      slot.status === 'Low / Quiet' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                    }`}>
+                      {slot.status}
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-extrabold text-slate-300 block">
+                    {slot.booking_count} historical bookings
+                  </span>
+                  <Link
+                    to="/bookings"
+                    state={{ prefillSlot: slot.slot }}
+                    className="mt-1 block w-full py-1 text-center rounded bg-slate-900 border border-slate-700 text-white font-extrabold text-[10px] hover:bg-slate-800 transition"
+                  >
+                    Reserve Slot
+                  </Link>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
@@ -309,6 +444,114 @@ const Dashboard = () => {
               <span>Students cannot double book themselves in multiple rooms for the same time slot.</span>
             </li>
           </ul>
+        </div>
+      </div>
+      {/* Student Ratings & Review Feedback Section (Admin & All Users) */}
+      <div className="glass-panel p-6 rounded-xl border border-slate-800/60 shadow-lg space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-amber-400" />
+            <h3 className="text-base font-extrabold text-slate-100">Student Reviews & Feedback Ratings</h3>
+          </div>
+          <Link to="/resources" className="text-xs font-semibold text-primary-400 hover:underline">
+            View All Reviews →
+          </Link>
+        </div>
+
+        {recentReviews.length === 0 ? (
+          <div className="text-center py-8 text-slate-500 text-xs">
+            No feedback reviews submitted yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentReviews.map((rev) => (
+              <div key={rev.id} className="p-4 rounded-xl glass-card border border-slate-800/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-200 truncate max-w-[150px]">{rev.user_name}</span>
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    <Star className="w-3 h-3 fill-amber-400" /> {rev.rating}/5
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 italic line-clamp-2">"{rev.comment || 'No comment provided.'}"</p>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-800/40 pt-2">
+                  <span>Resource #{rev.resource}</span>
+                  <span>{new Date(rev.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Approved and Rejected Reservations Display Cards at the Bottom */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+        {/* Recent Approved Bookings Card Grid */}
+        <div className="glass-panel p-6 rounded-xl border border-slate-800/60 shadow-lg space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-base font-extrabold text-slate-100">Approved Reservations</h3>
+            </div>
+            <Link to="/bookings" state={{ statusFilter: 'Approved' }} className="text-xs font-semibold text-emerald-400 hover:underline">
+              See All Approved →
+            </Link>
+          </div>
+
+          {recentApproved.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs">No approved bookings.</div>
+          ) : (
+            <div className="space-y-3">
+              {recentApproved.map((b) => (
+                <div key={b.id} className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-100">{b.resource_name}</span>
+                      <span className="text-[9px] font-mono text-emerald-300 bg-emerald-500/20 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                        #CRMS-PASS-{b.id}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">{b.user_name} ({b.user_email})</p>
+                    <span className="text-[10px] text-slate-500 block">📅 {b.booking_date} • 🕒 {b.time_slot}</span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                    Approved
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Rejected Bookings Card Grid */}
+        <div className="glass-panel p-6 rounded-xl border border-slate-800/60 shadow-lg space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-rose-400" />
+              <h3 className="text-base font-extrabold text-slate-100">Rejected Reservations</h3>
+            </div>
+            <Link to="/bookings" state={{ statusFilter: 'Rejected' }} className="text-xs font-semibold text-rose-400 hover:underline">
+              See All Rejected →
+            </Link>
+          </div>
+
+          {recentRejected.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs">No rejected bookings.</div>
+          ) : (
+            <div className="space-y-3">
+              {recentRejected.map((b) => (
+                <div key={b.id} className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-slate-100 block">{b.resource_name}</span>
+                    <p className="text-[11px] text-slate-400">{b.user_name} ({b.user_email})</p>
+                    <span className="text-[10px] text-slate-500 block">📅 {b.booking_date} • 🕒 {b.time_slot}</span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/15 border border-rose-500/30 text-rose-400">
+                    Rejected
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

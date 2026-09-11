@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
@@ -17,9 +17,15 @@ import {
   Check,
   CheckCheck,
   Info,
-  Calendar
+  ScanLine,
+  Calendar,
+  BarChart3,
+  Sun,
+  Moon,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import AiAssistantDrawer from './AiAssistantDrawer';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -27,10 +33,28 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isAiOpen, setIsAiOpen] = useState(false);
   
+  // Theme toggle state
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light-mode');
+    } else {
+      document.documentElement.classList.remove('light-mode');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Notification states
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const socketRef = useRef(null);
 
   const handleLogout = async () => {
     await logout();
@@ -50,11 +74,25 @@ const Layout = ({ children }) => {
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      // Poll notifications every 20 seconds
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const token = localStorage.getItem('access_token');
+      const socket = new WebSocket(`${protocol}://127.0.0.1:8000/ws/notifications/${user.id}/?token=${encodeURIComponent(token || '')}`);
+      socketRef.current = socket;
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        if (payload.message) {
+          showToast(payload.message, 'info');
+          fetchNotifications();
+        }
+      };
+      // Fallback keeps notifications current when the WebSocket service is unavailable.
       const interval = setInterval(fetchNotifications, 20000);
-      return () => clearInterval(interval);
+      return () => {
+        socket.close();
+        clearInterval(interval);
+      };
     }
-  }, [user]);
+  }, [user, showToast]);
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -97,16 +135,22 @@ const Layout = ({ children }) => {
       roles: ['Student', 'Staff', 'Admin']
     },
     {
-      name: 'Calendar',
-      path: '/calendar',
-      icon: <Calendar className="w-5 h-5" />,
-      roles: ['Student', 'Staff', 'Admin']
+      name: 'Calendar', path: '/calendar', icon: <Calendar className="w-5 h-5" />, roles: ['Student', 'Staff', 'Admin']
+    },
+    {
+      name: 'QR Scanner',
+      path: '/scan',
+      icon: <ScanLine className="w-5 h-5" />,
+      roles: ['Staff', 'Admin']
     },
     {
       name: 'Users',
       path: '/users',
       icon: <Users className="w-5 h-5" />,
       roles: ['Admin']
+    }
+    ,{
+      name: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['Admin']
     }
   ];
 
@@ -229,7 +273,26 @@ const Layout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 relative">
+          <div className="flex items-center gap-3 relative">
+            {/* AI Assistant Navbar Trigger */}
+            <button
+              onClick={() => setIsAiOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary-600/30 to-indigo-600/30 border border-primary-500/40 text-white font-extrabold text-xs hover:from-primary-600 hover:to-indigo-600 transition-all shadow-md shadow-primary-500/10"
+              title="Open Campus RMS AI Suite"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>AI Assistant</span>
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-amber-300 transition-all"
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+            </button>
+
             {/* Notification Bell Icon */}
             <div className="relative">
               <button
@@ -327,7 +390,7 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Content Page Container */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto relative">
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -337,6 +400,20 @@ const Layout = ({ children }) => {
             {children}
           </motion.div>
         </main>
+
+        {/* Floating AI Assistant FAB Button */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsAiOpen(true)}
+          className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-gradient-to-r from-primary-600 via-indigo-600 to-teal-500 text-white font-extrabold text-xs shadow-2xl shadow-primary-500/40 border border-white/20 flex items-center gap-2 hover:shadow-primary-500/60 transition"
+        >
+          <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+          <span>Ask AI Assistant</span>
+        </motion.button>
+
+        {/* AI Assistant Drawer */}
+        <AiAssistantDrawer isOpen={isAiOpen} onClose={() => setIsAiOpen(false)} />
       </div>
     </div>
   );

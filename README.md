@@ -26,7 +26,7 @@ A modern, glassmorphic full-stack web application for managing campus resources,
 ## 📋 Prerequisites
 *   **Python**: 3.8 or higher
 *   **Node.js**: 18.x or higher
-*   **MySQL**: 8.0 or higher
+*   **PostgreSQL**: 14 or higher
 *   **Git**
 
 ---
@@ -58,25 +58,20 @@ pip install -r requirements.txt
 ```
 
 #### Configure Database:
-1. Create a PostgreSQL database named `campusrms_db`:
+1. Start PostgreSQL locally, or from `CampusRMS/`:
+   ```bash
+   docker compose up -d
+   ```
+   Or create the database yourself:
    ```sql
    CREATE DATABASE campusrms_db;
    ```
-2. Update the database settings in `CampusRMS/backend/config/settings.py` with your credentials:
-   ```python
-   DATABASES = {
-       'default': {
-           'ENGINE': 'django.db.backends.postgresql',
-           'NAME': 'campusrms_db',
-           'USER': 'your_postgresql_username',
-           'PASSWORD': 'your_postgresql_password',
-           'HOST': 'localhost',
-           'PORT': '5432',
-       }
-   }
+2. Copy `backend/.env.example` to `backend/.env` and set credentials:
+   ```
+   DATABASE_URL=postgresql://postgres:1234@localhost:5432/campusrms_db
    ```
 
-   **For Render Deployment**: The database is configured automatically via `DATABASE_URL` environment variable.
+   **For Render Deployment**: Set `DATABASE_URL` to the Internal PostgreSQL URL.
 
 #### Apply Migrations:
 ```bash

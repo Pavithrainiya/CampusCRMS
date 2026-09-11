@@ -1,0 +1,21 @@
+﻿# Enhanced Analytics API Endpoint
+# Add this to the StatsView in views.py
+
+# Calculate Past vs Upcoming bookings
+past_bookings = Booking.objects.filter(booking_date__lt=today).count()
+upcoming_bookings_count = Booking.objects.filter(booking_date__gte=today).count()
+
+# Bookings over last 7 days
+from datetime import timedelta
+last_7_days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+bookings_by_day = []
+for day in last_7_days:
+    count = Booking.objects.filter(booking_date=day).count()
+    bookings_by_day.append({'date': day.strftime('%m/%d'), 'count': count})
+
+# Booking status distribution
+status_distribution = {
+    'Approved': Booking.objects.filter(status='Approved').count(),
+    'Pending': Booking.objects.filter(status='Pending').count(),
+    'Rejected': Booking.objects.filter(status='Rejected').count()
+}

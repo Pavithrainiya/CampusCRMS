@@ -303,23 +303,23 @@ const Users = () => {
 
       {/* Add / Edit User Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-lg glass-panel border-slate-800 rounded-2xl shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg glass-panel border-slate-800 rounded-2xl shadow-2xl relative my-auto max-h-[90vh] flex flex-col overflow-hidden">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+              className="absolute top-4 right-4 z-10 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="px-6 py-5 border-b border-slate-800/60">
+            <div className="px-6 py-5 border-b border-slate-800/60 shrink-0">
               <h2 className="text-lg font-bold text-slate-100">
                 {editingUser ? 'Edit User Details' : 'Create System User'}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">Configure name, contact, passwords, and authorization role</p>
             </div>
 
-            <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+            <form onSubmit={handleSaveUser} className="p-6 space-y-4 overflow-y-auto flex-1">
               {/* Full name */}
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
