@@ -142,11 +142,11 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Users CRUD (Admin Only)
+# Users CRUD (Staff / Admin)
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('-created_at')
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUserOnly]
+    permission_classes = [IsStaffOrAdmin]
 
 
 # Resources CRUD (Read: Authenticated, Write: Staff/Admin)

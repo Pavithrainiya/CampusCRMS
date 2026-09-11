@@ -53,8 +53,9 @@ function App() {
                 }
               />
               <Route path="/calendar" element={<Layout><Calendar /></Layout>} />
-              {/* Admin Access Only */}
-              <Route element={<RoleRoute allowedRoles={['Admin']} />}>
+              {/* Page Routes */}
+              <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
+              <Route element={<RoleRoute allowedRoles={['Staff', 'Admin']} />}>
                 <Route
                   path="/users"
                   element={
@@ -63,9 +64,6 @@ function App() {
                     </Layout>
                   }
                 />
-                <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-              </Route>
-              <Route element={<RoleRoute allowedRoles={['Staff', 'Admin']} />}>
                 <Route path="/scan" element={<Layout><QrScanner /></Layout>} />
               </Route>
             </Route>
