@@ -192,17 +192,6 @@ const Layout = ({ children }) => {
             </Link>
           );
         })}
-        {/* Dedicated RAG AI Assistant Sidebar Button */}
-        <button
-          onClick={() => {
-            setIsMobileOpen(false);
-            setIsAiOpen(true);
-          }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-sky-400 bg-sky-500/10 border border-sky-500/25 hover:bg-sky-500/20 transition-all duration-200 mt-2"
-        >
-          <Sparkles className="w-5 h-5 text-sky-400 animate-pulse" />
-          RAG AI Assistant
-        </button>
       </nav>
 
       {/* User Footer Profile */}
