@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from api.models import Resource
+from django.utils import timezone
+import datetime as dt
+from api.models import Resource, Booking, ResourceReview
 
 User = get_user_model()
 
@@ -289,4 +291,55 @@ class Command(BaseCommand):
                     if rev_c:
                         reviews_created += 1
 
-        self.stdout.write(self.style.SUCCESS(f'\nSuccessfully populated/updated {count} resources with images, dress code, equipment, materials, and {reviews_created} student reviews & ratings!'))
+        # Seed sample bookings for Analytics charts
+        today = timezone.localdate()
+        sample_bookings_data = [
+            # Past bookings (last 6 days)
+            {'res': 'Computer Lab 1', 'user_idx': 0, 'offset': -6, 'slot': '09:00 AM - 11:00 AM', 'status': 'Approved', 'purpose': 'CS301 Software Engineering Lab Practical'},
+            {'res': 'Science Lab', 'user_idx': 1, 'offset': -5, 'slot': '11:00 AM - 01:00 PM', 'status': 'Approved', 'purpose': 'Organic Chemistry Titration Experiment'},
+            {'res': 'Lecture Hall A', 'user_idx': 2, 'offset': -5, 'slot': '02:00 PM - 04:00 PM', 'status': 'Approved', 'purpose': 'Guest Lecture on Quantum Computing'},
+            {'res': 'Computer Lab 2', 'user_idx': 3, 'offset': -4, 'slot': '09:00 AM - 11:00 AM', 'status': 'Approved', 'purpose': 'Python Data Science Workshop'},
+            {'res': 'MacBook Pro Lab', 'user_idx': 0, 'offset': -4, 'slot': '02:00 PM - 04:00 PM', 'status': 'Rejected', 'purpose': 'Personal Video Editing Session'},
+            {'res': 'Gaming Lab', 'user_idx': 1, 'offset': -3, 'slot': '11:00 AM - 01:00 PM', 'status': 'Approved', 'purpose': '3D Game Graphics Rendering Practice'},
+            {'res': 'Seminar Room 1', 'user_idx': 2, 'offset': -3, 'slot': '02:00 PM - 04:00 PM', 'status': 'Approved', 'purpose': 'Senior Thesis Project Defense'},
+            {'res': 'Auditorium', 'user_idx': 3, 'offset': -2, 'slot': '09:00 AM - 01:00 PM', 'status': 'Approved', 'purpose': 'Annual Campus Cultural Summit'},
+            {'res': 'Conference Hall', 'user_idx': 0, 'offset': -2, 'slot': '02:00 PM - 04:00 PM', 'status': 'Approved', 'purpose': 'International Academic Video Conference'},
+            {'res': 'Design Studio', 'user_idx': 1, 'offset': -1, 'slot': '09:00 AM - 11:00 AM', 'status': 'Approved', 'purpose': 'Wacom Tablet UI/UX Prototype Review'},
+            {'res': 'Lecture Hall B', 'user_idx': 2, 'offset': -1, 'slot': '11:00 AM - 01:00 PM', 'status': 'Rejected', 'purpose': 'Unscheduled Extra Class'},
+            
+            # Today's bookings
+            {'res': 'Computer Lab 1', 'user_idx': 0, 'offset': 0, 'slot': '09:00 AM - 11:00 AM', 'status': 'Approved', 'purpose': 'Full-stack Web Dev Code Review'},
+            {'res': 'Student Activity Center', 'user_idx': 1, 'offset': 0, 'slot': '02:00 PM - 05:00 PM', 'status': 'Pending', 'purpose': 'Student Robotics Club Expo Setup'},
+            
+            # Upcoming bookings (next few days)
+            {'res': 'Computer Lab 2', 'user_idx': 2, 'offset': 1, 'slot': '09:00 AM - 11:00 AM', 'status': 'Pending', 'purpose': 'AI Neural Network Training Lab'},
+            {'res': 'Science Lab', 'user_idx': 3, 'offset': 2, 'slot': '11:00 AM - 01:00 PM', 'status': 'Approved', 'purpose': 'Microbiology Culture Examination'},
+            {'res': 'Lecture Hall A', 'user_idx': 0, 'offset': 3, 'slot': '02:00 PM - 04:00 PM', 'status': 'Pending', 'purpose': 'Department Orientation Seminar'},
+            {'res': 'MacBook Pro Lab', 'user_idx': 1, 'offset': 4, 'slot': '09:00 AM - 11:00 AM', 'status': 'Approved', 'purpose': 'Swift & SwiftUI iOS App Hackathon'},
+            {'res': 'Auditorium', 'user_idx': 2, 'offset': 5, 'slot': '10:00 AM - 04:00 PM', 'status': 'Pending', 'purpose': 'Campus Grand Annual Alumni Meet'},
+        ]
+
+        bookings_created = 0
+        for b_info in sample_bookings_data:
+            res_obj = Resource.objects.filter(resource_name=b_info['res']).first()
+            usr_obj = reviewers[b_info['user_idx'] % len(reviewers)]
+            b_date = today + dt.timedelta(days=b_info['offset'])
+            if res_obj and usr_obj:
+                b_item, b_c = Booking.objects.get_or_create(
+                    user=usr_obj,
+                    resource=res_obj,
+                    booking_date=b_date,
+                    time_slot=b_info['slot'],
+                    defaults={
+                        'purpose': b_info['purpose'],
+                        'status': b_info['status'],
+                        'amount_paid': 0.00,
+                        'payment_status': 'FREE',
+                        'checked_in': True if (b_info['offset'] < 0 and b_info['status'] == 'Approved') else False
+                    }
+                )
+                if b_c:
+                    bookings_created += 1
+
+        self.stdout.write(self.style.SUCCESS(f'\nSuccessfully populated/updated {count} resources with images, dress code, equipment, materials, {reviews_created} student reviews & ratings, and {bookings_created} sample bookings!'))
+

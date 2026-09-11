@@ -723,6 +723,12 @@ class AnalyticsView(APIView):
     permission_classes = [IsAdminUserOnly]
 
     def get(self, request):
+        if Booking.objects.count() == 0:
+            from django.core.management import call_command
+            try:
+                call_command('create_sample_resources')
+            except Exception as e:
+                print("AnalyticsView auto-seed error:", e)
         today = timezone.localdate()
         bookings = Booking.objects.all()
         approved = bookings.filter(status='Approved')
