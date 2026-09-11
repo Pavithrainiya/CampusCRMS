@@ -195,4 +195,98 @@ class Command(BaseCommand):
             count += 1
             self.stdout.write(self.style.SUCCESS(f'{"[NEW]" if created else "[UPDATED]"} {res.resource_name}'))
 
-        self.stdout.write(self.style.SUCCESS(f'\nSuccessfully populated/updated {count} resources with images, dress code, equipment, and materials required!'))
+        # Create or fetch sample users for student reviews
+        from api.models import ResourceReview
+        sample_users_data = [
+            {'email': 'alex.student@campus.edu', 'name': 'Alex Rivera', 'role': 'Student', 'phone': '9876543210'},
+            {'email': 'sarah.chen@campus.edu', 'name': 'Sarah Chen', 'role': 'Student', 'phone': '9876543211'},
+            {'email': 'marcus.v@campus.edu', 'name': 'Marcus Vance', 'role': 'Student', 'phone': '9876543212'},
+            {'email': 'emily.watson@campus.edu', 'name': 'Emily Watson', 'role': 'Student', 'phone': '9876543213'},
+        ]
+        reviewers = []
+        for u_data in sample_users_data:
+            u = User.objects.filter(email=u_data['email']).first()
+            if not u:
+                try:
+                    u = User.objects.create(
+                        email=u_data['email'],
+                        name=u_data['name'],
+                        role=u_data['role'],
+                        phone=u_data['phone'],
+                        status='Approved'
+                    )
+                    u.set_password('Student123!')
+                    u.save()
+                except Exception:
+                    u = admin
+            reviewers.append(u)
+
+        # Sample reviews mapping per resource name
+        reviews_map = {
+            'Computer Lab 1': [
+                (5, "Excellent dual-monitor workstations and ultra fast gigabit ethernet! Perfect for programming labs."),
+                (5, "Very quiet during off-peak hours (11 AM - 1 PM). All IDE tools are pre-configured."),
+                (4, "Great facility overall. Clean desks and powerful PCs.")
+            ],
+            'Computer Lab 2': [
+                (5, "Top notch setup for Python and AI model training. High speed internet worked seamlessly."),
+                (4, "Spacious and well ventilated. Projector visibility is excellent from all seats.")
+            ],
+            'Science Lab': [
+                (5, "Fume hood apparatus and safety gear are in top condition. Strict dress code enforced."),
+                (5, "Digital microscopes and precision scales worked flawlessly for our lab practical.")
+            ],
+            'Lecture Hall A': [
+                (5, "Tiered seating with excellent acoustic clarity and wireless microphones."),
+                (4, "Comfortable seats and crystal clear smart screen projection.")
+            ],
+            'Lecture Hall B': [
+                (5, "Dual wall projectors are amazing for split screen slides during lectures."),
+                (4, "Good air conditioning and room sound system.")
+            ],
+            'Seminar Room 1': [
+                (5, "Executive conference table and leather chairs are super comfortable for team discussions."),
+                (5, "Ideal room for thesis defenses and group presentations.")
+            ],
+            'Auditorium': [
+                (5, "Grand 500-seat theater with professional concert sound and stage lighting!"),
+                (5, "Backstage green room and stage console were impressive for our campus event.")
+            ],
+            'Conference Hall': [
+                (5, "Polycom video conferencing system and 4K display made international summit smooth."),
+                (4, "High-end venue with great catering layout area.")
+            ],
+            'Student Activity Center': [
+                (5, "Huge flexible arena for club expos and hackathons. Lots of extension power reels."),
+                (4, "Modular stage setup was super convenient for our cultural event.")
+            ],
+            'MacBook Pro Lab': [
+                (5, "M2 MacBook Pros with Xcode 15 and USB-C docks. Lightning fast for iOS app builds!"),
+                (5, "Super clean environment with Final Cut Pro and Adobe Creative Cloud installed.")
+            ],
+            'Gaming Lab': [
+                (5, "Liquid-cooled RTX 4090 rigs and 240Hz monitors are insane! Meta Quest 3 VR worked great."),
+                (5, "Best lab on campus for 3D graphics rendering and game design practicals.")
+            ],
+            'Design Studio': [
+                (5, "Wacom Cintiq Pro 24 drawing tablets and high-res plotters are top tier."),
+                (4, "Great lighting and spacious drawing easels for architecture projects.")
+            ]
+        }
+
+        reviews_created = 0
+        for res_name, rev_list in reviews_map.items():
+            res_obj = Resource.objects.filter(resource_name=res_name).first()
+            if res_obj:
+                for idx, (rating, comment) in enumerate(rev_list):
+                    reviewer = reviewers[idx % len(reviewers)]
+                    _, rev_c = ResourceReview.objects.get_or_create(
+                        resource=res_obj,
+                        user=reviewer,
+                        comment=comment,
+                        defaults={'rating': rating}
+                    )
+                    if rev_c:
+                        reviews_created += 1
+
+        self.stdout.write(self.style.SUCCESS(f'\nSuccessfully populated/updated {count} resources with images, dress code, equipment, materials, and {reviews_created} student reviews & ratings!'))

@@ -158,11 +158,11 @@ class ResourceViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated()]
         return [IsStaffOrAdmin()]
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['get', 'post'])
     def seed_sample(self, request):
         from django.core.management import call_command
         call_command('create_sample_resources')
-        return Response({"message": "Successfully populated campus facilities!"}, status=status.HTTP_200_OK)
+        return Response({"message": "Successfully populated campus facilities with ratings, reviews, and images!"}, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         resource = serializer.save(created_by=self.request.user)
@@ -177,6 +177,13 @@ class ResourceViewSet(viewsets.ModelViewSet):
         instance.delete()
 
     def get_queryset(self):
+        if not Resource.objects.exists():
+            try:
+                from django.core.management import call_command
+                call_command('create_sample_resources')
+            except Exception:
+                pass
+
         queryset = Resource.objects.all().order_by('-created_at')
 
         # Filter by Resource Type
